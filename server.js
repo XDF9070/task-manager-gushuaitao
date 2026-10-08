@@ -11,14 +11,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ------------------------------------------------------------
-// ⭐ Supabase 配置
-//    Project URL 已填好（来自你的项目 kjbykpzbzgypwnactmnos）
-//    只剩 1 处要填：把下面 SUPABASE_ANON_KEY 引号里换成你的
-//    「可发布密钥」（sb_publishable_ 开头的那串，点旁边的复制按钮）
-//    获取位置：Supabase → Project Settings → API Keys
-//    （旧版 eyJ 开头的 anon key 也能用）
+// ⭐ Supabase 配置（已全部填好，无需再改）
+//    Project URL 与可发布密钥均来自你自己的 Supabase 项目
+//    如需改用环境变量：在 Vercel 里配置 SUPABASE_URL / SUPABASE_ANON_KEY
 // ------------------------------------------------------------
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://kjbykpzbzgypwnactmnos.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://kjbykpzbgypwnactmnos.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_tDjMLtzqakxonusEJECDTA_kVNPPg41';
 
 // 是否已经填好密钥（没填时服务器照常启动，页面会给出友好提示）
@@ -35,13 +32,52 @@ app.use('/api/tasks', (req, res, next) => {
   if (CONFIGURED) return next();
   res.status(500).json({
     success: false,
-    message: '还没有配置 Supabase 密钥，请编辑 server.js 第 18、19 行填入你的 Project URL 和 anon key'
+    message: '还没有配置 Supabase 密钥，请检查 server.js 第 21、22 行的 SUPABASE_URL 和 SUPABASE_ANON_KEY'
   });
 });
 
 // 中间件：解析 JSON 请求体 + 托管 public 目录下的静态页面
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ============================================================
+// 字段名自适应
+//   不同人建表时「完成状态」字段可能叫 completed 或 is_complete，
+//   这里自动探测，两种都能用，前端统一拿到 completed 字段。
+// ============================================================
+let DONE_COL = null; // 实际使用的字段名
+
+async function detectDoneColumn() {
+  if (DONE_COL) return DONE_COL;
+
+  // 依次尝试：能查通的就是它
+  for (const col of ['completed', 'is_complete']) {
+    const { error } = await supabase.from('tasks').select(col).limit(1);
+    if (!error) {
+      DONE_COL = col;
+      console.log(`✅ 完成状态字段探测结果：${col}`);
+      return col;
+    }
+  }
+
+  // 两个都查不到，兜底用 completed 并让上层报错
+  DONE_COL = 'completed';
+  console.warn('⚠️  无法探测完成状态字段，可能是表结构不匹配');
+  return DONE_COL;
+}
+
+// 把数据库返回的行统一成前端要的格式（completed 字段）
+function normalizeTask(row) {
+  if (!row) return row;
+  const col = DONE_COL || 'completed';
+  return {
+    id: row.id,
+    title: row.title,
+    priority: row.priority,
+    completed: row.completed !== undefined ? row.completed : row[col],
+    created_at: row.created_at
+  };
+}
 
 // ============================================================
 // API 接口
@@ -52,6 +88,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/tasks', async (req, res) => {
   try {
     const { priority } = req.query;
+    await detectDoneColumn();
 
     // 按创建时间倒序（最新的在最上面）
     let query = supabase
@@ -67,7 +104,7 @@ app.get('/api/tasks', async (req, res) => {
     const { data, error } = await query;
 
     if (error) throw error;
-    res.json({ success: true, data });
+    res.json({ success: true, data: (data || []).map(normalizeTask) });
   } catch (err) {
     console.error('查询任务失败：', err.message);
     res.status(500).json({ success: false, message: err.message });
@@ -84,19 +121,22 @@ app.post('/api/tasks', async (req, res) => {
       return res.status(400).json({ success: false, message: '任务标题不能为空' });
     }
 
+    // 按实际字段名写入
+    const doneCol = await detectDoneColumn();
+
     const { data, error } = await supabase
       .from('tasks')
       .insert([
         {
           title: title.trim(),
           priority: priority || '中',
-          completed: false
+          [doneCol]: false
         }
       ])
       .select();
 
     if (error) throw error;
-    res.json({ success: true, data: data[0] });
+    res.json({ success: true, data: normalizeTask(data[0]) });
   } catch (err) {
     console.error('新增任务失败：', err.message);
     res.status(500).json({ success: false, message: err.message });
@@ -110,14 +150,16 @@ app.patch('/api/tasks/:id', async (req, res) => {
     const { id } = req.params;
     const { completed } = req.body;
 
+    const doneCol = await detectDoneColumn();
+
     const { data, error } = await supabase
       .from('tasks')
-      .update({ completed })
+      .update({ [doneCol]: completed })
       .eq('id', id)
       .select();
 
     if (error) throw error;
-    res.json({ success: true, data: data[0] });
+    res.json({ success: true, data: normalizeTask(data[0]) });
   } catch (err) {
     console.error('更新任务失败：', err.message);
     res.status(500).json({ success: false, message: err.message });
@@ -148,6 +190,54 @@ app.get('/api/health', (req, res) => {
     supabaseUrlConfigured: /^https?:\/\//i.test(SUPABASE_URL),
     keyConfigured: !SUPABASE_ANON_KEY.includes('在这里粘贴')
   });
+});
+
+// 深度诊断：直接测试能否连上 Supabase（排查 fetch failed 用）
+app.get('/api/diag', async (req, res) => {
+  const result = { url: SUPABASE_URL, steps: [] };
+
+  // 步骤1：用原生 fetch 探测 REST 端点
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+    });
+    result.steps.push({ step: 'fetch /rest/v1/', http: r.status });
+  } catch (e) {
+    result.steps.push({
+      step: 'fetch /rest/v1/',
+      error: e.message,
+      cause: e.cause ? String(e.cause.code || e.cause.message) : null,
+      causeDetail: e.cause ? String(e.cause) : null
+    });
+  }
+
+  // 步骤2：通过 supabase-js 查询
+  try {
+    const { data, error } = await supabase.from('tasks').select('id').limit(1);
+    result.steps.push({
+      step: 'supabase-js select',
+      ok: !error,
+      error: error ? error.message : null,
+      details: error ? { code: error.code, hint: error.hint, details: error.details } : null,
+      rows: data ? data.length : null
+    });
+  } catch (e) {
+    result.steps.push({
+      step: 'supabase-js select',
+      thrown: e.message,
+      cause: e.cause ? String(e.cause) : null
+    });
+  }
+
+  // 步骤3：环境信息
+  result.env = {
+    node: process.version,
+    hasProxy: !!(process.env.HTTPS_PROXY || process.env.https_proxy),
+    proxy: process.env.HTTPS_PROXY || process.env.https_proxy || null,
+    noProxy: process.env.NO_PROXY || process.env.no_proxy || null
+  };
+
+  res.json(result);
 });
 
 // 启动服务器
