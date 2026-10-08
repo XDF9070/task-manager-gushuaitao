@@ -11,17 +11,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ------------------------------------------------------------
-// ⭐ 第 1 步：填入你自己的 Supabase 密钥
-//    在这里替换成你的 Project URL 和 anon public key
-//    获取位置：Supabase 项目 → 左侧 Project Settings(齿轮) → API
+// ⭐ Supabase 配置
+//    Project URL 已填好（来自你的项目 kjbykpzbzgypwnactmnos）
+//    只剩 1 处要填：把下面 SUPABASE_ANON_KEY 引号里换成你的
+//    「可发布密钥」（sb_publishable_ 开头的那串，点旁边的复制按钮）
+//    获取位置：Supabase → Project Settings → API Keys
+//    （旧版 eyJ 开头的 anon key 也能用）
 // ------------------------------------------------------------
-const SUPABASE_URL = process.env.SUPABASE_URL || '在这里粘贴你的_SUPABASE_URL';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '在这里粘贴你的_SUPABASE_ANON_KEY';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://kjbykpzbzgypwnactmnos.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '在这里粘贴你的_sb_publishable_密钥';
 
 // 是否已经填好密钥（没填时服务器照常启动，页面会给出友好提示）
 const CONFIGURED =
   /^https?:\/\//i.test(SUPABASE_URL) && !SUPABASE_ANON_KEY.includes('在这里粘贴');
-
 // 创建 Supabase 客户端（未配置时给一个占位 URL，避免启动即崩溃）
 const supabase = createClient(
   CONFIGURED ? SUPABASE_URL : 'https://placeholder.supabase.co',

@@ -36,17 +36,17 @@ Supabase 项目 → 左侧 **SQL Editor** → New query → 粘贴 `supabase-set
 
 ### 2️⃣ 填密钥
 
-在 Supabase 项目 → 左侧 **Project Settings（齿轮）→ API**，复制两项：
+**Project URL 已填好**（`server.js` 第 21 行），只剩 1 处。
 
-- **Project URL**（`https://xxxx.supabase.co`）
-- **anon public key**（`eyJ` 开头的一长串）
-
-打开 `server.js` 第 18、19 行，替换掉中文占位符：
+在 Supabase → **Project Settings → API Keys**，复制 **可发布密钥**
+（`sb_publishable_` 开头；相当于旧版 anon key，⚠️ 不要用 `sb_secret_` 秘密密钥），
+替换 `server.js` 第 22 行：
 
 ```js
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://你的项目.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJ你的anon_key';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_你的密钥';
 ```
+
+> 旧版 `eyJ` 开头的 anon key 也可以用。
 
 ### 3️⃣ 部署
 
@@ -74,7 +74,7 @@ npm start
 
 | 现象 | 原因 & 解决 |
 |---|---|
-| 页面能打开但列表一直"加载失败" | Supabase 密钥没填 / 填错。检查 `server.js` 第 18、19 行 |
+| 页面能打开但列表一直"加载失败" | Supabase 密钥没填 / 填错。检查 `server.js` 第 22 行 |
 | 报错含 `row-level security` | RLS 策略没建。重新执行 `supabase-setup.sql` 的第 3、4 段 |
 | 报错含 `relation "tasks" does not exist` | 表没建。执行 `supabase-setup.sql` 的第 1 段 |
 | Vercel 部署后 404 | `vercel.json` 或导出方式问题，检查该文件是否已推送 |
