@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 3000;
 //    （旧版 eyJ 开头的 anon key 也能用）
 // ------------------------------------------------------------
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://kjbykpzbzgypwnactmnos.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '在这里粘贴你的_sb_publishable_密钥';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_tDjMLtzqakxonusEJECDTA_kVNPPg41';
 
 // 是否已经填好密钥（没填时服务器照常启动，页面会给出友好提示）
 const CONFIGURED =
