@@ -1,0 +1,21 @@
+{
+  "name": "task-manager-gushuaitao",
+  "version": "1.0.0",
+  "description": "智能任务管理系统 - Node.js + Express + Supabase",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "supabase",
+    "task-manager"
+  ],
+  "author": "顾帅涛",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "express": "^4.21.2"
+  }
+}
