@@ -46,6 +46,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 //   这里自动探测，两种都能用，前端统一拿到 completed 字段。
 // ============================================================
 let DONE_COL = null; // 实际使用的字段名
+let HAS_DUE_DATE = null; // 是否存在截止日期字段（拓展练习1）
 
 async function detectDoneColumn() {
   if (DONE_COL) return DONE_COL;
@@ -66,6 +67,15 @@ async function detectDoneColumn() {
   return DONE_COL;
 }
 
+// 探测 tasks 表是否有 due_date 字段（拓展练习1：截止日期）
+async function detectDueDate() {
+  if (HAS_DUE_DATE !== null) return HAS_DUE_DATE;
+  const { error } = await supabase.from('tasks').select('due_date').limit(1);
+  HAS_DUE_DATE = !error;
+  console.log(`✅ due_date 字段探测结果：${HAS_DUE_DATE ? '存在' : '不存在（请执行 拓展练习.sql）'}`);
+  return HAS_DUE_DATE;
+}
+
 // 把数据库返回的行统一成前端要的格式（completed 字段）
 function normalizeTask(row) {
   if (!row) return row;
@@ -75,6 +85,7 @@ function normalizeTask(row) {
     title: row.title,
     priority: row.priority,
     completed: row.completed !== undefined ? row.completed : row[col],
+    due_date: row.due_date || null,
     created_at: row.created_at
   };
 }
@@ -115,7 +126,7 @@ app.get('/api/tasks', async (req, res) => {
 // POST /api/tasks  body: { title: "写作业", priority: "高" }
 app.post('/api/tasks', async (req, res) => {
   try {
-    const { title, priority } = req.body;
+    const { title, priority, dueDate } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ success: false, message: '任务标题不能为空' });
@@ -123,16 +134,19 @@ app.post('/api/tasks', async (req, res) => {
 
     // 按实际字段名写入
     const doneCol = await detectDoneColumn();
+    const hasDue = await detectDueDate();
+
+    const newRow = {
+      title: title.trim(),
+      priority: priority || '中',
+      [doneCol]: false
+    };
+    // 表里有 due_date 字段且前端传了截止日期时才写入
+    if (hasDue && dueDate) newRow.due_date = dueDate;
 
     const { data, error } = await supabase
       .from('tasks')
-      .insert([
-        {
-          title: title.trim(),
-          priority: priority || '中',
-          [doneCol]: false
-        }
-      ])
+      .insert([newRow])
       .select();
 
     if (error) throw error;

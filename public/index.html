@@ -46,7 +46,7 @@
     /* ---------- 统计卡片 ---------- */
     .stats {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 12px;
       margin-bottom: 24px;
     }
@@ -168,6 +168,10 @@
     }
     .task:last-child { border-bottom: none; }
 
+    /* ⭐ 逾期任务标红（拓展练习1） */
+    .task.overdue { padding-left: 10px; border-radius: 10px; background: #fef2f2; }
+    .task.overdue .task-title { color: #dc2626; font-weight: 700; }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(-5px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -286,6 +290,44 @@
       line-height: 1.9;
     }
 
+    .stat-num.red { color: var(--high); }
+
+    /* ---------- 搜索框 ---------- */
+    .search-row { margin-bottom: 16px; position: relative; }
+    .search-row input {
+      width: 100%;
+      padding: 11px 16px 11px 40px;
+      font-size: 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      font-family: inherit;
+      background: #f9fafb;
+    }
+    .search-row input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+      background: #fff;
+    }
+    .search-row .search-icon {
+      position: absolute; left: 14px; top: 50%;
+      transform: translateY(-50%); font-size: 15px; color: #9ca3af;
+    }
+    .search-row .clear-btn {
+      position: absolute; right: 10px; top: 50%;
+      transform: translateY(-50%);
+      border: none; background: transparent; cursor: pointer;
+      font-size: 16px; color: #9ca3af; padding: 4px 8px; border-radius: 8px;
+      display: none;
+    }
+    .search-row .clear-btn:hover { background: #f3f4f6; color: var(--text); }
+
+    /* 日期输入 */
+    .add-row input[type="date"] {
+      flex: 0 0 150px; min-width: 150px; color: var(--text-light);
+    }
+
     @media (max-width: 520px) {
       header h1 { font-size: 24px; }
       .panel { padding: 18px; }
@@ -315,9 +357,25 @@
         <div class="stat-num" id="stat-rate">0%</div>
         <div class="stat-label">完成率</div>
       </div>
+      <div class="stat">
+        <div class="stat-num red" id="stat-high-left">0</div>
+        <div class="stat-label">高优先级剩余</div>
+      </div>
     </div>
 
     <div class="panel">
+      <!-- 搜索框（拓展练习2） -->
+      <div class="search-row">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          id="search-input"
+          placeholder="搜索任务标题…"
+          autocomplete="off"
+        />
+        <button class="clear-btn" id="search-clear" title="清空搜索">×</button>
+      </div>
+
       <!-- 添加任务 -->
       <div class="add-row">
         <input
@@ -327,6 +385,7 @@
           maxlength="200"
           autocomplete="off"
         />
+        <input type="date" id="due-date" title="截止日期（可选）" />
         <select id="priority-select">
           <option value="高">🔴 高</option>
           <option value="中" selected>🟡 中</option>
@@ -366,6 +425,7 @@
     const API = '/api/tasks';
 
     let currentFilter = '全部';   // 当前筛选的优先级
+    let searchKeyword = '';       // 当前搜索关键词（拓展练习2）
     let allTasks = [];            // 缓存的任务列表
 
     const $list       = document.getElementById('task-list');
@@ -402,6 +462,14 @@
       }[c]));
     }
 
+    // ---------- 判断是否逾期（拓展练习1）----------
+    // 截止日期早于今天 且 未完成 → 逾期
+    function isOverdue(task) {
+      if (!task.due_date || task.completed) return false;
+      const due = new Date(task.due_date + 'T23:59:59');
+      return due < new Date();
+    }
+
     // ---------- 加载任务 ----------
     async function loadTasks() {
       try {
@@ -426,29 +494,46 @@
 
     // ---------- 渲染列表 + 统计 ----------
     function render() {
-      // 统计始终基于当前筛选结果
+      // 搜索过滤（拓展练习2：按标题模糊搜索，不区分大小写）
+      const kw = searchKeyword.trim().toLowerCase();
+      const visibleTasks = kw
+        ? allTasks.filter(t => t.title.toLowerCase().includes(kw))
+        : allTasks;
+
+      // 统计基于全部任务（不受搜索影响）
       const total = allTasks.length;
       const done  = allTasks.filter(t => t.completed).length;
+      const highLeft = allTasks.filter(t => t.priority === '高' && !t.completed).length;
       document.getElementById('stat-total').textContent = total;
       document.getElementById('stat-done').textContent  = done;
       document.getElementById('stat-rate').textContent  =
         total ? Math.round(done / total * 100) + '%' : '0%';
+      document.getElementById('stat-high-left').textContent = highLeft;
 
       $list.innerHTML = '';
 
-      if (allTasks.length === 0) {
+      if (visibleTasks.length === 0) {
         $empty.style.display = 'block';
-        $emptyText.textContent = currentFilter === '全部'
-          ? '还没有任务，添加一个试试吧'
-          : `没有「${currentFilter}优先级」的任务`;
+        $emptyText.textContent = kw
+          ? `没有匹配「${searchKeyword.trim()}」的任务`
+          : currentFilter === '全部'
+            ? '还没有任务，添加一个试试吧'
+            : `没有「${currentFilter}优先级」的任务`;
         return;
       }
       $empty.style.display = 'none';
 
-      allTasks.forEach(task => {
+      visibleTasks.forEach(task => {
         const li = document.createElement('li');
-        li.className = 'task' + (task.completed ? ' done' : '');
+        li.className = 'task' + (task.completed ? ' done' : '') + (isOverdue(task) ? ' overdue' : '');
         li.dataset.id = task.id;
+
+        const overdueTag = isOverdue(task)
+          ? '<span style="color:#ef4444;font-weight:700;">⚠️ 已逾期</span>'
+          : '';
+        const dueTag = task.due_date
+          ? `<span>📅 截止：${esc(task.due_date)}</span> ${overdueTag}`
+          : '';
 
         li.innerHTML = `
           <div class="check" title="点击切换完成状态">
@@ -462,6 +547,7 @@
             <div class="task-meta">
               <span class="badge ${esc(task.priority)}">${esc(task.priority)}</span>
               <span>${formatTime(task.created_at)}</span>
+              ${dueTag}
             </div>
           </div>
           <button class="del-btn" title="删除任务">×</button>
@@ -489,7 +575,11 @@
         const res = await fetch(API, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, priority: $priority.value })
+          body: JSON.stringify({
+            title,
+            priority: $priority.value,
+            dueDate: document.getElementById('due-date').value || null
+          })
         });
         const json = await res.json();
         if (!json.success) throw new Error(json.message || '添加失败');
@@ -557,6 +647,21 @@
       btn.classList.add('active');
       currentFilter = btn.dataset.priority;
       loadTasks();
+    });
+
+    // ---------- 搜索框（拓展练习2）----------
+    const $search = document.getElementById('search-input');
+    const $searchClear = document.getElementById('search-clear');
+    $search.addEventListener('input', () => {
+      searchKeyword = $search.value;
+      $searchClear.style.display = searchKeyword ? 'block' : 'none';
+      render(); // 纯前端过滤，无需重新请求
+    });
+    $searchClear.addEventListener('click', () => {
+      $search.value = '';
+      searchKeyword = '';
+      $searchClear.style.display = 'none';
+      render();
     });
 
     // ---------- 启动 ----------
