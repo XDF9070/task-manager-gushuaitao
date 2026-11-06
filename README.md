@@ -59,6 +59,8 @@ alter table public.tasks add column if not exists completed_at timestamptz;
 
 - 没执行迁移时：增删改查、统计、折线图都正常，只有「分类」存不进去（页面顶部会有提示）
 - 执行迁移后：分类、饼图、按分类筛选、批量归类全部可用
+- 迁移执行完**不用重启、不用重新部署**：服务端探测结果缓存 20 秒，过期后自动识别新字段，写分类时还会强制重探一次
+- 老任务的「完成时间」为空不影响折线图：前端按「创建当天即完成」处理，不会出现断层
 - 密钥只存在于服务端，前端代码里没有任何数据库密钥
 
 ## API
@@ -97,7 +99,7 @@ npm start
 | 报错含 `row-level security` | RLS 策略没建，重新执行 `supabase-setup.sql` 第 3、4 段 |
 | 报错含 `relation "tasks" does not exist` | 表没建，执行 `supabase-setup.sql` 第 1 段 |
 | 顶部提示"分类功能待启用" | 还没执行 `migration-v2.sql`，复制页面上的 SQL 到 Supabase SQL Editor 跑一次 |
-| 老任务都显示"未分类" | 迁移不会猜分类。在「分类管理」里用「一键归类」批量补上 |
+| 老任务都显示"未分类" | 迁移不会猜分类。在「分类管理」里选「按标题智能识别」再点「一键归类」，识别不出的会保持原样 |
 
 ---
 
