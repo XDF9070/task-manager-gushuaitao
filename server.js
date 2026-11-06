@@ -68,8 +68,13 @@ const caps = {
   doneCol: null,
   hasDueDate: null,
   hasCategory: null,
-  hasCompletedAt: null
+  hasCompletedAt: null,
+  detectedAt: 0
 };
+
+// 探测结果缓存有效期：用户在 Supabase 里执行完迁移后，最迟 20 秒自动生效，
+// 写操作还会额外强制重探一次，避免"刚加完字段但缓存仍是旧值"导致分类写不进去。
+const CAPS_TTL = 20 * 1000;
 
 async function columnExists(col) {
   const { error } = await supabase.from('tasks').select(col).limit(1);
@@ -77,9 +82,10 @@ async function columnExists(col) {
 }
 
 async function detectCaps(force = false) {
-  if (!force && caps.hasCategory !== null) return caps;
+  if (!force && caps.hasCategory !== null && Date.now() - caps.detectedAt < CAPS_TTL) {
+    return caps;
+  }
 
-  // 完成状态字段：completed 优先，兼容 is_complete
   if (force || !caps.doneCol) {
     caps.doneCol = 'completed';
     for (const col of ['completed', 'is_complete']) {
@@ -91,6 +97,7 @@ async function detectCaps(force = false) {
   caps.hasDueDate = await columnExists('due_date');
   caps.hasCategory = await columnExists('category');
   caps.hasCompletedAt = await columnExists('completed_at');
+  caps.detectedAt = Date.now();
 
   console.log(
     `✅ 表结构：due_date=${caps.hasDueDate ? '有' : '无'} ` +
@@ -194,7 +201,9 @@ app.post('/api/tasks', async (req, res) => {
       return res.status(400).json({ success: false, message: '优先级只能是 高 / 中 / 低' });
     }
 
-    const c = await detectCaps();
+    let c = await detectCaps();
+    // 带了分类但缓存说没这字段 → 强制重探（迁移刚执行完的场景）
+    if (category && !c.hasCategory) c = await detectCaps(true);
 
     const newRow = {
       title: String(title).trim(),
@@ -219,7 +228,8 @@ app.patch('/api/tasks/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const body = req.body || {};
-    const c = await detectCaps();
+    let c = await detectCaps();
+    if (body.category !== undefined && !c.hasCategory) c = await detectCaps(true);
 
     const patch = {};
 

@@ -660,20 +660,63 @@ function renderStats() {
     }
   }
 
+  // 按标题关键词猜分类（只做建议，点按钮才写入）
+  const CAT_KEYWORDS = {
+    '健身': ['健身', '练腿', '练背', '练胸', '有氧', '跑步', '晨跑', '夜跑', '锻炼', '运动', '瑜伽',
+             '游泳', '骑行', '跳绳', '深蹲', '俯卧撑', '拉伸', '撸铁', '打球', '篮球', '足球',
+             '羽毛球', '乒乓', '体重', '减脂', '增肌', '步数', '公里'],
+    '学习': ['学习', '复习', '预习', '背单词', '单词', '英语', '数学', '语文', '物理', '化学',
+             '考试', '作业', '练习', '刷题', '论文', '读书', '看书', '阅读', '课程', '网课',
+             '教程', '笔记', '实验', '题', '考试', '答辩', '毕设'],
+    '工作': ['工作', '会议', '开会', '报表', '项目', '汇报', '周报', '日报', '客户', '需求',
+             '文档', '方案', '对接', '评审', '排期', '上线', '部署', '面试', '简历', '邮件',
+             '提交', '代码', '仓库', '数据', '接口', '域名', '网址', '网站', '测试', '修复',
+             'vercel', 'github', 'supabase', '.env', '浏览器', 'bug'],
+    '生活': ['买菜', '做饭', '洗衣', '打扫', '购物', '快递', '缴费', '房租', '水电', '看病',
+             '买药', '理发', '家务', '收纳', '取件', '聚餐', '旅行', '回家', '祝福', '生日']
+  };
+
+  function guessCategory(title) {
+    const t = String(title || '').toLowerCase();
+    if (!t) return null;
+    let best = null, bestLen = 0;
+    for (const cat of CATS) {
+      for (const kw of CAT_KEYWORDS[cat] || []) {
+        if (t.includes(kw.toLowerCase()) && kw.length > bestLen) {
+          best = cat;
+          bestLen = kw.length;
+        }
+      }
+    }
+    return best;
+  }
+
   async function bulkCategorize() {
-    const cat = $('#bulkCat').value;
+    const picked = $('#bulkCat').value;
+    const auto = picked === 'auto';
     const targets = state.tasks.filter((t) => !t.category);
     if (!targets.length) return;
+
+    // 智能识别时先算出每个任务的归属，识别不出的保持原样
+    const plan = auto
+      ? targets.map((t) => ({ task: t, cat: guessCategory(t.title) })).filter((p) => p.cat)
+      : targets.map((t) => ({ task: t, cat: picked }));
+
+    if (!plan.length) {
+      toast('这些任务标题里没有可识别的关键词，请手动选择分类', 'warn');
+      return;
+    }
+
     const btn = $('#bulkApply');
     btn.disabled = true;
     btn.textContent = '归类中…';
     let ok = 0, fail = 0;
-    for (const t of targets) {
+    for (const p of plan) {
       try {
-        await api(`${API}/${t.id}`, {
+        await api(`${API}/${p.task.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ category: cat })
+          body: JSON.stringify({ category: p.cat })
         });
         ok++;
       } catch (_) { fail++; }
@@ -681,8 +724,12 @@ function renderStats() {
     btn.disabled = false;
     btn.textContent = '一键归类';
     await loadTasks(true);
+
+    const left = state.tasks.filter((t) => !t.category).length;
     if (fail) toast(`已归类 ${ok} 个，${fail} 个失败`, 'warn');
-    else toast(`已把 ${ok} 个任务归入「${cat}」`);
+    else if (auto && left) toast(`已智能归类 ${ok} 个，剩余 ${left} 个识别不出，请手动指定`);
+    else if (auto) toast(`已智能归类 ${ok} 个任务`);
+    else toast(`已把 ${ok} 个任务归入「${picked}」`);
   }
 
   // ============================================================
