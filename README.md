@@ -52,7 +52,10 @@ v2 只做了**增量迁移**，完全不改动已有字段和数据：
 ```sql
 alter table public.tasks add column if not exists category text;
 alter table public.tasks add column if not exists completed_at timestamptz;
+-- 回填历史完成时间（自动识别完成状态字段叫 completed 还是 is_complete）
 ```
+
+完整脚本见 `migration-v2.sql`，也可直接在页面顶部的提示条点「复制迁移 SQL」。
 
 - 没执行迁移时：增删改查、统计、折线图都正常，只有「分类」存不进去（页面顶部会有提示）
 - 执行迁移后：分类、饼图、按分类筛选、批量归类全部可用

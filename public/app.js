@@ -29,11 +29,23 @@
   const PRI_RANK = { '高': 0, '中': 1, '低': 2 };
   const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
-  const MIGRATION_SQL = `-- 智能任务管理系统 v2 · 安全增量迁移（不清空任何数据）
+  const MIGRATION_SQL = `-- 智能任务管理系统 v2 · 安全增量迁移（只加字段，不清空数据）
 alter table public.tasks add column if not exists category text;
 alter table public.tasks add column if not exists completed_at timestamptz;
-update public.tasks set completed_at = created_at
- where completed_at is null and completed is true;
+
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+              where table_schema='public' and table_name='tasks' and column_name='completed') then
+    update public.tasks set completed_at = created_at
+     where completed_at is null and completed is true;
+  elsif exists (select 1 from information_schema.columns
+                 where table_schema='public' and table_name='tasks' and column_name='is_complete') then
+    update public.tasks set completed_at = created_at
+     where completed_at is null and is_complete is true;
+  end if;
+end $$;
+
 create index if not exists tasks_category_idx on public.tasks (category);`;
 
   // ============================================================
