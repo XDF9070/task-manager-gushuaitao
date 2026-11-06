@@ -658,6 +658,7 @@ button { cursor: pointer; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .task.done .task-title { color: var(--text-3); text-decoration: line-through; }
+[data-theme="dark"] .task.done .task-title { color: #8593ae; }
 
 .cat-pill {
   flex: 0 0 auto;

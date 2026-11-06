@@ -534,7 +534,7 @@ function renderStats() {
         </button>
         <span class="pri ${esc(t.priority)}">${esc(t.priority)}优先级</span>
         <span class="task-title" title="${esc(t.title)}">${esc(t.title)}</span>
-        <span class="cat-pill ${catCls}">${icon(t.completed ? 'check' : 'grid')}${catName}</span>
+        <span class="cat-pill ${catCls}">${catName}</span>
         <span class="due ${isToday(t) ? 'today' : ''}">${icon('calendar')}${dueLabel(t)}</span>
         ${t.completed ? '<span class="done-tag">已完成</span>' : ''}
         <span class="task-acts">
