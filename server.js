@@ -1,15 +1,12 @@
 // ============================================================
-// 智能任务管理系统 - 后端服务器 v2
+// 智能任务管理系统 - 后端服务器 v3
 // Node.js + Express 提供 API，Supabase 存数据
 //
-// v2 升级说明（安全增量，不破坏原有功能）：
-//   1. 保留原有 GET / POST / PATCH / DELETE 的全部语义
-//   2. 新增字段自适应：category（分类）、completed_at（完成时间）
-//      —— 数据库里有没有这两个字段都能正常跑
-//   3. 新增完整编辑能力（标题 / 优先级 / 分类 / 截止日期）
-//   4. 新增 /api/meta 让前端知道数据库当前支持哪些字段
-//   5. 所有校验、错误处理只增不减
-//   6. 数据库密钥只存在于服务端，前端永远拿不到
+// v3 升级说明（安全增量，不破坏原有功能）：
+//   1. 保留 v2 全部接口和字段自适应逻辑
+//   2. 新增 /api/ai/chat 代理（AI Key 在服务端环境变量）
+//   3. 新增 /api/pomodoro 番茄钟专注记录（可选表，不存在时优雅降级）
+//   4. 数据库密钥只存在于服务端，前端永远拿不到
 // ============================================================
 
 const express = require('express');
@@ -145,7 +142,7 @@ app.get('/api/meta', async (req, res) => {
     await detectCaps();
     res.json({
       success: true,
-      version: '2.0',
+      version: '3.0',
       configured: CONFIGURED,
       features: {
         category: !!caps.hasCategory,
@@ -353,6 +350,111 @@ app.get('/api/diag', async (req, res) => {
   };
 
   res.json(result);
+});
+
+// ============================================================
+// AI 助手代理（Key 存在服务端环境变量，前端永不接触）
+//   Vercel 环境变量：AI_API_BASE（默认 https://api.openai.com/v1）
+//                    AI_API_KEY（sk-...）
+//                    AI_MODEL（默认 gpt-3.5-turbo）
+// ============================================================
+const AI_API_BASE = process.env.AI_API_BASE || 'https://api.openai.com/v1';
+const AI_API_KEY = process.env.AI_API_KEY || '';
+const AI_MODEL = process.env.AI_MODEL || 'gpt-3.5-turbo';
+
+app.post('/api/ai/chat', async (req, res) => {
+  if (!AI_API_KEY) {
+    return res.json({
+      success: false,
+      message: 'AI 未配置。请在 Vercel 环境变量中设置 AI_API_KEY。',
+      reply: '⚠️ 后端尚未配置 AI API Key。请联系管理员在 Vercel 项目设置中添加 AI_API_KEY 环境变量后重启部署。'
+    });
+  }
+  try {
+    const userMessage = (req.body && req.body.message) || '';
+    if (!userMessage.trim()) {
+      return res.status(400).json({ success: false, message: '消息不能为空' });
+    }
+
+    const aiRes = await fetch(`${AI_API_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${AI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: AI_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: '你是一个任务管理助手。用户会用自然语言描述任务，你需要提取任务标题、优先级（高/中/低）、截止日期（YYYY-MM-DD格式）和分类（学习/工作/健身/生活）。以JSON格式返回：{"title":"任务标题","priority":"中","due_date":"2026-11-12","category":"学习"}。如果没有提到日期就填null，没有分类就填null。也可以用自然语言回复用户的问题。'
+          },
+          { role: 'user', content: userMessage }
+        ],
+        temperature: 0.3
+      })
+    });
+
+    const data = await aiRes.json();
+    if (!aiRes.ok) {
+      throw new Error(data.error?.message || `AI 请求失败（HTTP ${aiRes.status}）`);
+    }
+
+    const reply = data.choices?.[0]?.message?.content || '无法解析，请换个说法试试。';
+    res.json({ success: true, reply });
+  } catch (err) {
+    console.error('AI 请求失败：', err.message);
+    res.status(500).json({ success: false, message: err.message, reply: '❌ AI 请求失败：' + err.message });
+  }
+});
+
+// AI 配置状态查询（前端用来显示是否已连接）
+app.get('/api/ai/status', (req, res) => {
+  res.json({
+    configured: !!AI_API_KEY,
+    model: AI_MODEL,
+    base: AI_API_BASE
+  });
+});
+
+// ============================================================
+// 番茄钟专注记录（可选，表不存在时优雅降级）
+//   需要先在 Supabase 执行 migration-v3.sql 建表
+// ============================================================
+app.get('/api/pomodoro', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('pomodoro_sessions')
+      .select('*')
+      .order('started_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    res.json({ success: true, data: data || [] });
+  } catch (err) {
+    // 表不存在时返回空列表，不报错
+    res.json({ success: true, data: [], warning: '番茄钟记录表未创建，请执行 migration-v3.sql' });
+  }
+});
+
+app.post('/api/pomodoro', async (req, res) => {
+  try {
+    const { duration, type, task_title } = req.body || {};
+    if (!duration || duration < 1) {
+      return res.status(400).json({ success: false, message: '专注时长无效' });
+    }
+    const { data, error } = await supabase
+      .from('pomodoro_sessions')
+      .insert([{
+        duration: duration,
+        type: type || 'focus',
+        task_title: task_title || null
+      }])
+      .select();
+    if (error) throw error;
+    res.json({ success: true, data: data[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message, warning: '番茄钟记录表未创建，请执行 migration-v3.sql' });
+  }
 });
 
 // 启动服务器
