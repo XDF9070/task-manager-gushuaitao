@@ -79,6 +79,67 @@ npm start
 | 报错含 `relation "tasks" does not exist` | 表没建。执行 `supabase-setup.sql` 的第 1 段 |
 | Vercel 部署后 404 | `vercel.json` 或导出方式问题，检查该文件是否已推送 |
 
+## V3.0 升级内容
+
+V3 是**纯增量升级**：不动原有表结构语义、不清空任何数据，未执行迁移时自动降级为旧功能。
+
+### 新增功能
+
+| 功能 | 说明 |
+|---|---|
+| 九大视图 | 首页 / 今日任务 / 日历中心 / 全部任务 / 我的计划 / 专注中心 / 数据分析 / 分类管理 / 系统设置 |
+| 日历中心 | 月 / 周 / 日三种视图，按截止日期落点 |
+| 子任务 | 每个任务可拆多条，带完成进度（1/3） |
+| 番茄钟 | 25/5/15 分钟三档，记录落库，可关联具体任务 |
+| 年度热力图 | 类似 GitHub 贡献图，数据来自 `task_events` 事件表 |
+| 重复任务 | 每天 / 每周 / 每月，完成后自动生成下一次，超过终止日期停止 |
+| 看板 | 待办 / 进行中 / 已完成三列拖拽，状态真实落库 |
+| 数据分析 | 30 天柱状图、每周趋势、分类完成率、月度概览 |
+| 备份恢复 | 导出 JSON / CSV（带 BOM 防 Excel 乱码），导入按「标题 + 截止日期」判重，绝不覆盖 |
+
+### 升级步骤（必做一次）
+
+Supabase → SQL Editor → 粘贴 `supabase/migration-v3.sql` → Run。
+脚本是幂等的，可重复执行；只会 `create table` / `add column`，不会删除任何数据。
+
+执行后重启服务，控制台出现「✅ 检测到 V3 迁移已完成」即成功。
+
+### 新增接口
+
+```
+GET    /api/meta                    能力探测（前端据此隐藏不支持的功能）
+GET    /api/tasks/:id/subtasks      子任务列表
+POST   /api/tasks/:id/subtasks      新增子任务
+PATCH  /api/subtasks/:id            勾选 / 改名
+DELETE /api/subtasks/:id            删除子任务
+GET    /api/categories              分类列表
+POST   /api/categories              新增分类
+PATCH  /api/categories/:id          改名 / 改色
+DELETE /api/categories/:id          删除分类
+POST   /api/pomodoro                记录一次专注
+GET    /api/pomodoro/stats          专注统计
+GET    /api/stats/heatmap           年度热力图
+GET    /api/stats/overview          概览统计
+GET    /api/export?format=json|csv  导出备份
+POST   /api/import                  导入备份（merge 判重）
+```
+
+### 时区说明
+
+数据库存 UTC，统计与热力图按自然日归属。默认按北京时间（UTC+8）分天，
+避免 0:00–8:00 完成的任务被算到前一天；如需改时区，设置环境变量
+`APP_TZ_OFFSET_MIN`（例如 `0` 表示 UTC）。
+
+### 自动化测试
+
+```bash
+PORT=3100 node server.js                 # 先起服务
+node scripts/test-ui.js http://127.0.0.1:3100    # 42 项界面测试
+node scripts/test-v3-api.js http://127.0.0.1:3100 # 58 项接口测试
+```
+
+两个脚本都会自动创建并清理自己的测试数据，不会污染既有任务。
+
 ---
 
 课程：低代码开发技术（实践） · 练习二

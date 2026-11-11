@@ -4,3 +4,6 @@ node_modules/
 *.log
 .env
 .env.local
+screenshots/
+docs/baseline-v3/
+dev-v3.log
