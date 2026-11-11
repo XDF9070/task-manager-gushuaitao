@@ -358,9 +358,9 @@ app.get('/api/diag', async (req, res) => {
 //                    AI_API_KEY（sk-...）
 //                    AI_MODEL（默认 gpt-3.5-turbo）
 // ============================================================
-const AI_API_BASE = process.env.AI_API_BASE || 'https://api.openai.com/v1';
-const AI_API_KEY = process.env.AI_API_KEY || '';
-const AI_MODEL = process.env.AI_MODEL || 'gpt-3.5-turbo';
+const AI_API_BASE = process.env.AI_API_BASE || 'https://api.deepseek.com/v1';
+const AI_API_KEY = process.env.AI_API_KEY || 'sk-050cf2e99c694444ba800af662969677';
+const AI_MODEL = process.env.AI_MODEL || 'deepseek-chat';
 
 app.post('/api/ai/chat', async (req, res) => {
   if (!AI_API_KEY) {
