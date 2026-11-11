@@ -105,20 +105,29 @@ function check(name, ok, detail = '') {
   const created = after.data.find((t) => t.title === testTitle);
   check('新任务已写入数据库', !!created, created ? `id=${created.id}` : '未找到');
 
+  // 轮询等待任务达到期望状态，避免线上冷启动时固定等待不够
+  const waitTask = async (id, expectDone, timeout = 15000) => {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      const j = await (await fetch(`${BASE}/api/tasks`)).json();
+      const t = j.data.find((x) => x.id === id);
+      if (t && t.completed === expectDone) return t;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    const j = await (await fetch(`${BASE}/api/tasks`)).json();
+    return j.data.find((x) => x.id === id);
+  };
+
   console.log('\n=== 5. 完成与恢复 ===');
   if (created) {
     const row = page.locator(`.task[data-id="${created.id}"]`).first();
     await row.locator('[data-act="toggle"]').click();
-    await page.waitForTimeout(1200);
-    const done = await (await fetch(`${BASE}/api/tasks`)).json();
-    const t1 = done.data.find((t) => t.id === created.id);
+    const t1 = await waitTask(created.id, true);
     check('标记完成已保存', t1 && t1.completed === true, `completed=${t1 && t1.completed}`);
 
     const row2 = page.locator(`.task[data-id="${created.id}"]`).first();
     await row2.locator('[data-act="toggle"]').click();
-    await page.waitForTimeout(1200);
-    const undone = await (await fetch(`${BASE}/api/tasks`)).json();
-    const t2 = undone.data.find((t) => t.id === created.id);
+    const t2 = await waitTask(created.id, false);
     check('恢复未完成已保存', t2 && t2.completed === false, `completed=${t2 && t2.completed}`);
   }
 
@@ -262,6 +271,16 @@ function check(name, ok, detail = '') {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
     });
     check('测试事件已清理', clean.ok, `HTTP ${clean.status}`);
+
+    const all = await (await fetch(`${BASE}/api/tasks`)).json();
+    const strays = all.data.filter((t) => String(t.title).startsWith('V3测试-自动化-'));
+    for (const s of strays) {
+      await fetch(`${BASE}/api/tasks/${s.id}`, { method: 'DELETE' });
+      await fetch(`${SUP}/rest/v1/task_events?task_id=eq.${s.id}`, {
+        method: 'DELETE', headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
+      });
+    }
+    if (strays.length) console.log(`        另外清理了 ${strays.length} 条历史残留测试任务`);
   }
 
   console.log('\n=== 15. 控制台错误 ===');
