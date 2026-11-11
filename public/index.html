@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#f4f6fb">
-<title>智能任务管理系统 V3.0</title>
+<title>任务助手 V3.0</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M9 16.5l5 5 9-11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -50,6 +50,9 @@
   <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4"></path><path d="M7.5 8.5L12 4l4.5 4.5"></path><path d="M4 20h16"></path></symbol>
   <symbol id="i-fire" viewBox="0 0 24 24"><path d="M12 2.5c3.5 4 6.5 6.8 6.5 10.5a6.5 6.5 0 11-13 0c0-2 1-3.8 2.5-5.2.3 1.6 1.2 2.6 2.3 2.9-.4-3 .6-6 1.7-8.2z"></path></symbol>
   <symbol id="i-subtask" viewBox="0 0 24 24"><path d="M4 6h7M4 12h7M4 18h7"></path><path d="M15 5.5l2 2 4-4"></path><path d="M15 17.5l2 2 4-4"></path></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9a6 6 0 10-12 0c0 5-2 6.5-2 6.5h16S18 14 18 9z"></path><path d="M10.3 19a2 2 0 003.4 0"></path></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z"></path></symbol>
+  <symbol id="i-robot" viewBox="0 0 24 24"><rect x="4" y="7.5" width="16" height="12" rx="4"></rect><circle cx="9.2" cy="13.2" r="1.4" fill="currentColor" stroke="none"></circle><circle cx="14.8" cy="13.2" r="1.4" fill="currentColor" stroke="none"></circle><path d="M12 3.5v4M9.5 17.2h5"></path><path d="M2.5 12v3M21.5 12v3"></path></symbol>
 </svg>
 
 <div id="app">
@@ -59,44 +62,37 @@
     <div class="sidebar-logo">
       <div class="logo-icon"><svg class="icon"><use href="#i-logo"/></svg></div>
       <div class="logo-text">
-        <b>智能任务管理</b>
-        <span>V3.0 智能平台</span>
+        <b>任务助手</b>
+        <span>Task Manager V3.0</span>
       </div>
       <button class="sidebar-close" id="sidebarClose" aria-label="关闭菜单"><svg class="icon"><use href="#i-x"/></svg></button>
     </div>
 
     <nav class="sidebar-nav">
-      <div class="nav-group">
-        <div class="nav-group-title">主菜单</div>
-        <button class="nav-item active" data-nav="dashboard"><svg class="icon"><use href="#i-home"/></svg><span>首页</span></button>
-        <button class="nav-item" data-nav="today"><svg class="icon"><use href="#i-check-circle"/></svg><span>今日任务</span><span class="nav-badge" id="todayBadge">0</span></button>
-        <button class="nav-item" data-nav="calendar"><svg class="icon"><use href="#i-calendar"/></svg><span>日历中心</span></button>
-        <button class="nav-item" data-nav="tasks"><svg class="icon"><use href="#i-list"/></svg><span>全部任务</span></button>
-        <button class="nav-item" data-nav="plan"><svg class="icon"><use href="#i-target"/></svg><span>我的计划</span></button>
-      </div>
+      <button class="nav-item active" data-nav="dashboard"><svg class="icon c-indigo"><use href="#i-home"/></svg><span>首页</span></button>
+      <button class="nav-item" data-nav="tasks"><svg class="icon c-blue"><use href="#i-list"/></svg><span>任务管理</span></button>
+      <button class="nav-item" data-nav="calendar"><svg class="icon c-violet"><use href="#i-calendar"/></svg><span>日历视图</span></button>
+      <button class="nav-item" data-nav="kanban"><svg class="icon c-teal"><use href="#i-kanban"/></svg><span>看板视图</span></button>
+      <button class="nav-item" data-nav="ai"><svg class="icon c-purple"><use href="#i-ai"/></svg><span>AI 任务助手</span></button>
+      <button class="nav-item" data-nav="pomodoro"><svg class="icon c-orange"><use href="#i-pomodoro"/></svg><span>番茄钟</span></button>
+      <button class="nav-item" data-nav="analytics"><svg class="icon c-green"><use href="#i-chart"/></svg><span>数据分析</span></button>
+      <button class="nav-item" data-nav="settings"><svg class="icon c-slate"><use href="#i-settings"/></svg><span>个性化设置</span></button>
 
-      <div class="nav-group">
-        <div class="nav-group-title">效率工具</div>
-        <button class="nav-item" data-nav="pomodoro"><svg class="icon"><use href="#i-pomodoro"/></svg><span>专注中心</span></button>
-        <button class="nav-item" data-nav="analytics"><svg class="icon"><use href="#i-chart"/></svg><span>数据分析</span></button>
-        <button class="nav-item" data-nav="ai"><svg class="icon"><use href="#i-ai"/></svg><span>AI 助手</span></button>
-      </div>
-
-      <div class="nav-group">
-        <div class="nav-group-title">系统</div>
-        <button class="nav-item" data-nav="categories"><svg class="icon"><use href="#i-tag"/></svg><span>分类管理</span></button>
-        <button class="nav-item" data-nav="settings"><svg class="icon"><use href="#i-settings"/></svg><span>系统设置</span></button>
-      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-group-title">更多</div>
+      <button class="nav-item compact" data-nav="today"><svg class="icon"><use href="#i-check-circle"/></svg><span>今日任务</span><span class="nav-badge" id="todayBadge">0</span></button>
+      <button class="nav-item compact" data-nav="plan"><svg class="icon"><use href="#i-target"/></svg><span>我的计划</span></button>
+      <button class="nav-item compact" data-nav="categories"><svg class="icon"><use href="#i-tag"/></svg><span>分类管理</span></button>
     </nav>
 
     <div class="sidebar-footer">
-      <div class="sidebar-user">
-        <div class="avatar" id="userAvatar">顾</div>
-        <div class="user-info">
-          <b id="userName">顾帅涛</b>
-          <span id="userRole">V3.0 · 已连接</span>
-        </div>
+      <div class="upgrade-card">
+        <div class="upgrade-bolt"><svg class="icon"><use href="#i-fire"/></svg></div>
+        <b>全新升级</b>
+        <span>更智能 · 更高效</span>
+        <button class="upgrade-btn" data-goto="analytics">立即体验 →</button>
       </div>
+      <p class="sidebar-copy">© 2026 任务助手<br><span>Powered by Supabase</span></p>
     </div>
   </aside>
   <div class="sidebar-scrim" id="scrim"></div>
@@ -109,106 +105,205 @@
         <h1 id="pageTitle">首页</h1>
         <span class="topbar-date" id="todayText"></span>
       </div>
+
+      <div class="topbar-search">
+        <svg class="icon"><use href="#i-search"/></svg>
+        <input type="text" id="globalSearch" placeholder="搜索任务... (Ctrl + K)" autocomplete="off">
+      </div>
+
       <div class="topbar-actions">
         <button class="icon-btn" id="themeSwitch" aria-label="切换主题">
           <svg class="icon" id="themeIcon"><use href="#i-moon"/></svg>
         </button>
+        <button class="icon-btn bell-btn" id="notifyBtn" aria-label="通知">
+          <svg class="icon"><use href="#i-bell"/></svg>
+          <span class="bell-dot" id="bellDot" hidden></span>
+        </button>
         <button class="btn-primary" id="btnAddTop">
           <svg class="icon"><use href="#i-plus"/></svg><span>新建任务</span>
         </button>
+        <button class="topbar-avatar" id="userAvatar" title="顾帅涛">顾</button>
       </div>
     </header>
 
     <!-- ========== 首页 ========== -->
     <section class="view" id="viewDashboard">
-      <div class="welcome-card">
-        <div class="welcome-text">
-          <h2 id="welcomeTitle">你好，顾帅涛！👋</h2>
-          <p id="welcomeSub">合理规划时间，遇见更好的自己</p>
+      <!-- 欢迎横幅 -->
+      <div class="hero">
+        <svg class="hero-art" viewBox="0 0 460 168" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+          <defs>
+            <radialGradient id="heroSun" cx="50%" cy="50%" r="50%">
+              <stop offset="0" stop-color="#fff" stop-opacity=".85"/>
+              <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <circle cx="318" cy="46" r="46" fill="url(#heroSun)" opacity=".55"/>
+          <circle cx="318" cy="46" r="15" fill="#fff" opacity=".55"/>
+          <path d="M0 168 L78 82 L142 132 L216 58 L286 120 L354 72 L460 152 L460 168 Z" fill="#fff" opacity=".08"/>
+          <path d="M0 168 L104 104 L178 150 L256 92 L330 142 L412 100 L460 168 Z" fill="#fff" opacity=".13"/>
+          <g fill="#fff" opacity=".7">
+            <circle cx="256" cy="70" r="3.6"/>
+            <path d="M253 75h6l2.6 12h-2.6l-.9 7h-1.6l-.9-7h-2.6z"/>
+          </g>
+        </svg>
+        <div class="hero-copy">
+          <h2 id="welcomeTitle"><span class="hero-sun">☀</span><span id="welcomeGreet">晚上好，顾帅涛！</span></h2>
+          <p id="welcomeSub">今天也要加油哦，完成更多目标~</p>
         </div>
-        <div class="welcome-stats-inline">
-          <div class="mini-stat"><span class="mini-stat-label">今日待办</span><b id="miniToday">0</b></div>
-          <div class="mini-stat"><span class="mini-stat-label">已完成</span><b id="miniDone">0</b></div>
-          <div class="mini-stat"><span class="mini-stat-label">完成率</span><b id="miniRate">0%</b></div>
+        <div class="hero-quote">“ 坚持做正确的事，<br>时间会给你答案。”</div>
+      </div>
+
+      <!-- 四张指标卡 -->
+      <div class="stat-row">
+        <div class="stat-tile">
+          <div class="tile-ico ico-blue"><svg class="icon"><use href="#i-check-circle"/></svg></div>
+          <div class="tile-body">
+            <span class="tile-label">今日任务</span>
+            <b class="tile-value"><span id="statTodayDone">0</span><span class="tile-sep">/</span><span id="statTodayTotal">0</span></b>
+            <div class="tile-bar"><i id="barToday" style="width:0%"></i></div>
+          </div>
+        </div>
+        <div class="stat-tile">
+          <div class="tile-ico ico-green"><svg class="icon"><use href="#i-calendar"/></svg></div>
+          <div class="tile-body">
+            <span class="tile-label">本周完成</span>
+            <b class="tile-value"><span id="statWeekDone">0</span><span class="tile-sep">/</span><span id="statWeekTotal">0</span></b>
+            <div class="tile-bar"><i id="barWeek" class="green" style="width:0%"></i></div>
+          </div>
+        </div>
+        <div class="stat-tile">
+          <div class="tile-ico ico-violet"><svg class="icon"><use href="#i-clock"/></svg></div>
+          <div class="tile-body">
+            <span class="tile-label">专注时长</span>
+            <b class="tile-value"><span id="statFocusHours">0</span><span class="tile-unit">h</span></b>
+            <span class="tile-delta up" id="deltaFocus">今日 0 min</span>
+          </div>
+        </div>
+        <div class="stat-tile">
+          <div class="tile-ico ico-amber"><svg class="icon"><use href="#i-fire"/></svg></div>
+          <div class="tile-body">
+            <span class="tile-label">连续打卡</span>
+            <b class="tile-value"><span id="statStreak">0</span><span class="tile-unit">天</span></b>
+            <span class="tile-delta" id="deltaStreak">保持节奏</span>
+          </div>
         </div>
       </div>
 
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon blue"><svg class="icon"><use href="#i-list"/></svg></div>
-          <div class="stat-body">
-            <span class="stat-label">总任务数</span>
-            <div class="stat-value-row"><b id="statTotal">0</b><span class="delta" id="deltaTotal"></span></div>
+      <!-- 第一行：我的任务 / 日历 / 番茄钟 -->
+      <div class="dash-grid">
+        <div class="card dash-tasks">
+          <div class="card-head">
+            <h3>我的任务</h3>
+            <button class="btn-primary btn-sm" id="dashAddTask"><svg class="icon"><use href="#i-plus"/></svg><span>添加任务</span></button>
           </div>
+          <div class="dash-tabs" id="dashTabs">
+            <button class="dash-tab active" data-dtask="all">全部</button>
+            <button class="dash-tab" data-dtask="doing">进行中</button>
+            <button class="dash-tab" data-dtask="done">已完成</button>
+          </div>
+          <ul class="dash-task-list" id="dashTaskList"></ul>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon green"><svg class="icon"><use href="#i-check-circle"/></svg></div>
-          <div class="stat-body">
-            <span class="stat-label">已完成</span>
-            <div class="stat-value-row"><b id="statDone">0</b><span class="delta" id="deltaDone"></span></div>
+
+        <div class="card dash-cal">
+          <div class="card-head">
+            <h3>日历视图</h3>
+            <button class="link-btn" data-goto="calendar">设置 ›</button>
           </div>
+          <div class="mini-cal" id="miniCal"></div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon orange"><svg class="icon"><use href="#i-clock"/></svg></div>
-          <div class="stat-body">
-            <span class="stat-label">待完成</span>
-            <div class="stat-value-row"><b id="statPending">0</b><span class="delta" id="deltaPending"></span></div>
+
+        <div class="card dash-pom">
+          <div class="card-head">
+            <h3>番茄钟</h3>
+            <button class="link-btn" data-goto="pomodoro">设置</button>
           </div>
-        </div>
-        <div class="stat-card stat-card-ring">
-          <div class="stat-body">
-            <span class="stat-label">完成率</span>
-            <div class="stat-value-row"><b id="statRate">0%</b><span class="delta" id="deltaRate"></span></div>
+          <div class="mini-pom">
+            <div class="mini-pom-ring">
+              <svg viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" class="mini-pom-track"/>
+                <circle cx="60" cy="60" r="52" class="mini-pom-progress" id="miniPomProgress"/>
+              </svg>
+              <div class="mini-pom-time">
+                <b id="miniPomTime">25:00</b>
+                <span>专注时间</span>
+              </div>
+            </div>
+            <button class="mini-pom-start" id="miniPomStart"><svg class="icon"><use href="#i-play"/></svg><span>开始专注</span></button>
+            <div class="mini-pom-presets">
+              <div class="preset"><b id="presetFocus">25min</b><span>专注</span></div>
+              <div class="preset"><b id="presetShort">5min</b><span>休息</span></div>
+              <div class="preset"><b>4次</b><span>一轮</span></div>
+            </div>
           </div>
-          <div class="rate-ring" id="rateRing"></div>
         </div>
       </div>
 
-      <div class="charts-row">
-        <div class="card chart-card">
+      <!-- 第二行：数据分析 / AI 助手 / 个性化设置 -->
+      <div class="dash-grid">
+        <div class="card dash-analytics">
           <div class="card-head">
-            <h3>最近 7 天趋势</h3>
-            <span class="card-sub" id="lineSub">每日完成数量</span>
+            <h3>数据分析</h3>
+            <div class="seg-group seg-xs" id="dashRange">
+              <button class="seg-btn active" data-range="7">近7天</button>
+              <button class="seg-btn" data-range="30">近30天</button>
+              <button class="seg-btn" data-range="90">近90天</button>
+            </div>
           </div>
-          <div class="chart-box" id="lineChartBox"></div>
+          <div class="dash-analytics-body">
+            <div class="chart-box" id="lineChartBox"></div>
+            <ul class="dash-kpi" id="dashKpi">
+              <li><span class="kpi-dot green"></span><span class="kpi-label">完成任务</span><b id="kpiDone">0 个</b></li>
+              <li><span class="kpi-dot violet"></span><span class="kpi-label">专注时长</span><b id="kpiFocus">0 h</b></li>
+              <li><span class="kpi-dot amber"></span><span class="kpi-label">效率提升</span><b id="kpiGrowth">+0%</b></li>
+            </ul>
+          </div>
         </div>
-        <div class="card chart-card">
-          <div class="card-head">
-            <h3>任务分类统计</h3>
-            <span class="card-sub">占比分布</span>
-          </div>
-          <div class="donut-wrap">
-            <div class="donut-box" id="donutBox"></div>
-            <ul class="donut-legend" id="donutLegend"></ul>
-          </div>
-        </div>
-      </div>
 
-      <div class="dashboard-row">
-        <div class="card">
+        <div class="card dash-ai">
           <div class="card-head">
-            <h3>今日待办</h3>
-            <button class="link-btn" data-goto="today">查看全部 →</button>
+            <h3><svg class="icon ai-title-icon"><use href="#i-spark"/></svg>AI 任务助手</h3>
+            <button class="link-btn" data-goto="ai">更多 ›</button>
           </div>
-          <div class="today-list" id="todayList"></div>
-        </div>
-        <div class="card">
-          <div class="card-head">
-            <h3>最近任务</h3>
-            <button class="link-btn" data-goto="tasks">全部任务 →</button>
+          <div class="ai-mini-hero">
+            <div class="ai-mini-avatar"><svg class="icon"><use href="#i-robot"/></svg></div>
+            <div class="ai-mini-copy">
+              <b>你好！我是你的 AI 助手</b>
+              <p>有什么任务管理问题都可以问我哦~</p>
+            </div>
           </div>
-          <div class="recent-list" id="recentList"></div>
+          <div class="ai-mini-chips">
+            <button class="ai-chip" data-aiask="帮我规划今天剩余的任务，按优先级排序">规划今日任务</button>
+            <button class="ai-chip" data-aiask="分析一下我这周的任务完成效率，并给出改进建议">分析效率</button>
+            <button class="ai-chip" data-aiask="根据我现有的任务，推荐接下来一周的学习计划">推荐计划</button>
+          </div>
+          <div class="ai-mini-input">
+            <input type="text" id="dashAiInput" placeholder="输入你的问题...">
+            <button class="ai-mini-send" id="dashAiSend" aria-label="发送"><svg class="icon"><use href="#i-send"/></svg></button>
+          </div>
         </div>
-      </div>
 
-      <!-- 学习活跃度热力图 -->
-      <div class="card heatmap-card">
-        <div class="card-head">
-          <h3>学习活跃度</h3>
-          <div class="heat-legend" id="heatLegend"></div>
+        <div class="card dash-settings">
+          <div class="card-head">
+            <h3>个性化设置</h3>
+            <button class="link-btn" data-goto="settings">更多 ›</button>
+          </div>
+          <div class="mini-setting-row">
+            <div class="mini-setting-info"><svg class="icon"><use href="#i-moon"/></svg><span>主题模式</span></div>
+            <div class="switch" id="dashThemeSwitch" role="switch" aria-checked="false"></div>
+          </div>
+          <div class="mini-setting-row">
+            <div class="mini-setting-info"><svg class="icon"><use href="#i-bell"/></svg><span>提醒通知</span></div>
+            <div class="switch on" id="dashRemindSwitch" role="switch" aria-checked="true"></div>
+          </div>
+          <div class="mini-setting-row">
+            <div class="mini-setting-info"><svg class="icon"><use href="#i-target"/></svg><span>数据同步</span></div>
+            <span class="mini-setting-value" id="dashSyncState"><i class="sync-dot"></i>已连接 Supabase</span>
+          </div>
+          <div class="mini-setting-row">
+            <div class="mini-setting-info"><svg class="icon"><use href="#i-list"/></svg><span>语言设置</span></div>
+            <span class="mini-setting-value">简体中文 ›</span>
+          </div>
         </div>
-        <div class="heat-stats" id="heatStats"></div>
-        <div class="heatmap-scroll"><div class="heatmap" id="heatmap"></div></div>
       </div>
     </section>
 

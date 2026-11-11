@@ -48,20 +48,23 @@
   const PRI_RANK = { '高': 0, '中': 1, '低': 2 };
   const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   const WEEK_SHORT = ['日', '一', '二', '三', '四', '五', '六'];
+  // 日历统一按周一起始，和首页迷你日历保持一致
+  const WEEK_MON = ['一', '二', '三', '四', '五', '六', '日'];
   const REPEAT_LABEL = { none: '', daily: '每天', weekly: '每周', monthly: '每月' };
   const STATUS_LABEL = { todo: '待办', doing: '进行中', done: '已完成' };
 
   const VIEW_TITLES = {
     dashboard: '首页',
     today: '今日任务',
-    calendar: '日历中心',
-    tasks: '全部任务',
+    calendar: '日历视图',
+    tasks: '任务管理',
+    kanban: '看板视图',
     plan: '我的计划',
-    pomodoro: '专注中心',
+    pomodoro: '番茄钟',
     analytics: '数据分析',
     categories: '分类管理',
-    settings: '系统设置',
-    ai: 'AI 助手'
+    settings: '个性化设置',
+    ai: 'AI 任务助手'
   };
 
   // ============================================================
@@ -75,6 +78,9 @@
     pomStats: { today: 0, total: 0, minutesToday: 0, daily: [] },
     aiInfo: { configured: false },
     view: 'dashboard',
+    dashTab: 'all',
+    dashRange: 7,
+    miniCalDate: new Date(),
     tab: 'all',
     cat: '全部',
     search: '',
@@ -364,6 +370,17 @@
   // 视图切换
   // ============================================================
   function setView(view) {
+    const titleKey = view;
+    // 看板视图是任务管理的子模式，单独做成导航入口
+    if (view === 'kanban') {
+      state.taskMode = 'kanban';
+      localStorage.setItem(LS.taskMode, 'kanban');
+      view = 'tasks';
+    } else if (view === 'tasks' && state.taskMode === 'kanban') {
+      state.taskMode = 'list';
+      localStorage.setItem(LS.taskMode, 'list');
+    }
+    state.lastNav = view;
     state.view = view;
     const map = {
       dashboard: 'viewDashboard', today: 'viewToday', calendar: 'viewCalendar',
@@ -375,8 +392,13 @@
       const el = document.getElementById(id);
       if (el) el.hidden = k !== view;
     });
-    $$('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.nav === view));
-    $('#pageTitle').textContent = VIEW_TITLES[view] || '首页';
+    $$('.nav-item').forEach((b) => {
+      const nav = b.dataset.nav;
+      const on = nav === view || (view === 'tasks' && nav === 'kanban' && state.taskMode === 'kanban');
+      b.classList.toggle('active', on && !(nav === 'tasks' && state.taskMode === 'kanban'));
+    });
+    $('#pageTitle').textContent = VIEW_TITLES[titleKey] || '首页';
+    document.title = `${VIEW_TITLES[titleKey] || '首页'} · 任务助手 V3.0`;
     window.scrollTo({ top: 0, behavior: 'smooth' });
     closeSidebar();
     renderCurrentView();
@@ -408,97 +430,218 @@
   // ============================================================
   // 首页
   // ============================================================
+  function setText(sel, v) {
+    const el = $(sel);
+    if (el) el.textContent = v;
+  }
+
+  function setBar(sel, pct) {
+    const el = $(sel);
+    if (el) el.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+  }
+
   function renderDashboard() {
     const s = stats();
-    $('#statTotal').textContent = s.total;
-    $('#statDone').textContent = s.done;
-    $('#statPending').textContent = s.pending;
-    $('#statRate').textContent = s.rate + '%';
-    $('#miniToday').textContent = s.todayTasks;
-    $('#miniDone').textContent = s.done;
-    $('#miniRate').textContent = s.rate + '%';
-
-    setDelta('#deltaTotal', s.createdToday > 0 ? `今日 +${s.createdToday}` : '今日 0', s.createdToday > 0 ? 'up' : 'flat');
-    setDelta('#deltaDone', s.doneToday > 0 ? `今日 +${s.doneToday}` : '今日 0', s.doneToday > 0 ? 'up' : 'flat');
-    setDelta('#deltaPending', s.overdue > 0 ? `逾期 ${s.overdue}` : '无逾期', s.overdue > 0 ? 'down' : 'flat');
-    setDelta('#deltaRate', `${s.rate}%`, 'flat');
-
-    renderRateRing(s.rate);
+    renderDashStats(s);
+    renderDashTasks();
+    renderMiniCal();
+    renderMiniPom();
+    renderDashKpi();
     renderLineChart();
-    renderDonut();
-    renderTodayList();
-    renderRecentList();
-    renderHeatmapInto($('#heatmap'), $('#heatStats'), $('#heatLegend'));
 
     const h = new Date().getHours();
     const greet = h < 6 ? '夜深了' : h < 11 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好';
-    $('#welcomeTitle').textContent = `${greet}，顾帅涛！👋`;
-    $('#welcomeSub').textContent = s.todayTasks
-      ? `今天还有 ${s.todayTasks} 项待办${s.overdue ? `，另有 ${s.overdue} 项已逾期` : ''}`
-      : '今天的任务都完成了，享受这份轻松吧';
+    setText('#welcomeGreet', `${greet}，顾帅涛！`);
+    setText('.hero-sun', h < 6 || h >= 18 ? '🌙' : '☀');
+
+    const sub = $('#welcomeSub');
+    if (sub) {
+      sub.textContent = s.todayTasks
+        ? `今天还有 ${s.todayTasks} 项待办${s.overdue ? `，另有 ${s.overdue} 项已逾期` : ''}，一起加油~`
+        : '今天的任务都完成了，享受这份轻松吧~';
+    }
+
+    // 有逾期任务时给通知铃加红点
+    const dot = $('#bellDot');
+    if (dot) dot.hidden = s.overdue === 0;
   }
 
-  function setDelta(sel, text, cls) {
-    const el = $(sel);
-    if (!el) return;
-    el.textContent = text;
-    el.className = 'delta ' + cls;
+  /* 四张指标卡 */
+  function renderDashStats(s) {
+    const todayAll = state.tasks.filter(isToday);
+    const todayDone = todayAll.filter((t) => t.completed).length;
+    setText('#statTodayDone', todayDone);
+    setText('#statTodayTotal', todayAll.length);
+    setBar('#barToday', todayAll.length ? (todayDone / todayAll.length) * 100 : 0);
+
+    // 本周以周一为起点
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    monday.setHours(0, 0, 0, 0);
+    const startKey = dayStr(monday);
+    const endKey = dayStr(now);
+
+    const weekDone = state.tasks.filter((t) => t.completed
+      && isoDay(t.completed_at || t.created_at) >= startKey
+      && isoDay(t.completed_at || t.created_at) <= endKey).length;
+    const weekDue = state.tasks.filter((t) => t.due_date
+      && t.due_date >= startKey && t.due_date <= endKey).length;
+    const weekTotal = Math.max(weekDone, weekDue);
+
+    setText('#statWeekDone', weekDone);
+    setText('#statWeekTotal', weekTotal);
+    setBar('#barWeek', weekTotal ? (weekDone / weekTotal) * 100 : 0);
+
+    const minutesToday = (state.pomStats && state.pomStats.minutesToday) || 0;
+    setText('#statFocusHours', (minutesToday / 60).toFixed(1));
+    setText('#deltaFocus', minutesToday > 0 ? `今日 ${minutesToday} min` : '今日还没专注');
+
+    const streak = (state.heat && state.heat.streak) || 0;
+    setText('#statStreak', streak);
+    setText('#deltaStreak', streak > 0 ? '保持节奏' : '今天开始打卡');
   }
 
-  function renderRateRing(rate) {
-    const el = $('#rateRing');
+  /* 我的任务（首页） */
+  function renderDashTasks() {
+    const el = $('#dashTaskList');
     if (!el) return;
-    const r = 22, c = 2 * Math.PI * r;
+    let list = state.tasks.slice();
+    if (state.dashTab === 'doing') list = list.filter((t) => !t.completed);
+    else if (state.dashTab === 'done') list = list.filter((t) => t.completed);
+    list = sortTasks(list).slice(0, 6);
+
+    if (!list.length) {
+      el.innerHTML = `<li class="dash-empty">${state.dashTab === 'done'
+        ? '还没有已完成的任务'
+        : '暂无任务，点右上角「添加任务」开始规划'}</li>`;
+      return;
+    }
+
+    el.innerHTML = list.map((t) => {
+      const color = catColor(t.category);
+      const priCls = t.priority === '高' ? '' : (t.priority === '中' ? 'mid' : 'low');
+      return `<li class="dash-task-item${t.completed ? ' done' : ''}" data-open="${t.id}">
+        <span class="dash-check" data-dtoggle="${t.id}" role="checkbox" aria-checked="${t.completed}"><svg class="icon"><use href="#i-check"/></svg></span>
+        <span class="dash-task-title">${esc(t.title)}</span>
+        ${t.completed ? '' : `<span class="pri-text ${priCls}">${esc(t.priority)}优先级</span>`}
+        ${t.category ? `<span class="cat-tag" style="background:${color}1a;color:${color}">${esc(t.category)}</span>` : ''}
+        <span class="dash-due${isOverdue(t) ? ' overdue' : ''}">${esc(dueLabel(t))}</span>
+      </li>`;
+    }).join('');
+  }
+
+  /* 迷你月历：周一开头，固定 6 行 */
+  function renderMiniCal() {
+    const el = $('#miniCal');
+    if (!el) return;
+    const base = state.miniCalDate || new Date();
+    const y = base.getFullYear();
+    const m = base.getMonth();
+    const startOffset = (new Date(y, m, 1).getDay() + 6) % 7;
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const prevMonthDays = new Date(y, m, 0).getDate();
+    const today = todayStr();
+    const marked = new Set(
+      state.tasks.filter((t) => t.due_date && !t.completed).map((t) => t.due_date)
+    );
+
+    const cells = [];
+    for (let i = startOffset; i > 0; i--) {
+      const d = prevMonthDays - i + 1;
+      cells.push({ d, other: true, key: dayStr(new Date(y, m - 1, d)) });
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push({ d, other: false, key: dayStr(new Date(y, m, d)) });
+    }
+    let next = 1;
+    while (cells.length < 42) {
+      cells.push({ d: next, other: true, key: dayStr(new Date(y, m + 1, next)) });
+      next++;
+    }
+
     el.innerHTML = `
-      <svg viewBox="0 0 52 52">
-        <circle cx="26" cy="26" r="${r}" fill="none" stroke="var(--border)" stroke-width="5"/>
-        <circle cx="26" cy="26" r="${r}" fill="none" stroke="var(--primary)" stroke-width="5"
-                stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c - (c * rate) / 100}"
-                style="transition:stroke-dashoffset .5s ease"/>
-      </svg>
-      <span class="ring-text">${rate}%</span>`;
+      <div class="mini-cal-head">
+        <button data-mcal="-1" aria-label="上个月"><svg class="icon"><use href="#i-left"/></svg></button>
+        <span>${y}年${m + 1}月</span>
+        <button data-mcal="1" aria-label="下个月"><svg class="icon"><use href="#i-right"/></svg></button>
+      </div>
+      <div class="mini-cal-week">${WEEK_MON.map((d) => `<span>${d}</span>`).join('')}</div>
+      <div class="mini-cal-grid">
+        ${cells.map((c) => `<div class="mini-cal-day${c.other ? ' other' : ''}${c.key === today ? ' today' : ''}${marked.has(c.key) ? ' has-task' : ''}" data-calkey="${c.key}">${c.d}</div>`).join('')}
+      </div>`;
   }
 
-  function renderTodayList() {
-    const el = $('#todayList');
-    if (!el) return;
-    const list = sortTasks(state.tasks.filter((t) => !t.completed && (isToday(t) || isOverdue(t)))).slice(0, 5);
-    if (!list.length) {
-      el.innerHTML = '<div style="text-align:center;padding:26px;color:var(--text-3);font-size:13px">🎉 今天没有待办任务</div>';
-      return;
+  /* 迷你番茄钟 */
+  function renderMiniPom() {
+    const d = pomDurations();
+    setText('#presetFocus', `${Math.round(d.focus / 60)}min`);
+    setText('#presetShort', `${Math.round(d.short / 60)}min`);
+    updateMiniPom();
+  }
+
+  function updateMiniPom() {
+    const t = $('#miniPomTime');
+    if (t) {
+      const m = Math.floor(state.pom.seconds / 60);
+      const s = state.pom.seconds % 60;
+      t.textContent = `${pad(m)}:${pad(s)}`;
     }
-    el.innerHTML = list.map((t) => `
-      <div class="today-item" data-open="${t.id}" style="cursor:pointer">
-        <span class="pri ${esc(t.priority)}">${esc(t.priority)}</span>
-        <span class="task-title">${esc(t.title)}</span>
-        ${isOverdue(t) ? '<span style="color:var(--danger);font-size:11px">已逾期</span>' : ''}
-        <span class="cat-pill" style="background:${catColor(t.category)}18;color:${catColor(t.category)}">${esc(t.category || '未分类')}</span>
-      </div>`).join('');
-  }
-
-  function renderRecentList() {
-    const el = $('#recentList');
-    if (!el) return;
-    const list = state.tasks.slice().sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 5);
-    if (!list.length) {
-      el.innerHTML = '<div style="text-align:center;padding:26px;color:var(--text-3);font-size:13px">还没有任务</div>';
-      return;
+    const ring = $('#miniPomProgress');
+    if (ring) {
+      const c = 2 * Math.PI * 52;
+      const left = state.pom.totalSeconds ? state.pom.seconds / state.pom.totalSeconds : 1;
+      ring.style.strokeDasharray = c;
+      ring.style.strokeDashoffset = c * (1 - left);
     }
-    el.innerHTML = list.map((t) => `
-      <div class="recent-item" data-open="${t.id}" style="cursor:pointer">
-        ${t.completed ? '<span style="color:var(--success)">✓</span>' : '<span style="color:var(--text-3)">○</span>'}
-        <span class="task-title" style="${t.completed ? 'text-decoration:line-through;opacity:.6' : ''}">${esc(t.title)}</span>
-        <span class="due">${esc(dueLabel(t))}</span>
-      </div>`).join('');
+    const label = $('#miniPomStart span');
+    if (label) label.textContent = state.pom.running ? '暂停专注' : '开始专注';
+    const ico = $('#miniPomStart use');
+    if (ico) ico.setAttribute('href', state.pom.running ? '#i-pause' : '#i-play');
   }
 
-  // ---------- 7 天趋势（完成数量） ----------
-  function last7() {
+  /* 数据分析卡的三个指标 */
+  function renderDashKpi() {
+    const n = state.dashRange || 7;
+    const since = addDays(todayStr(), -(n - 1));
+    const done = state.tasks.filter((t) => t.completed
+      && isoDay(t.completed_at || t.created_at) >= since).length;
+    setText('#kpiDone', `${done} 个`);
+
+    const minutesTotal = (state.pomStats && state.pomStats.minutesTotal) || 0;
+    setText('#kpiFocus', `${(minutesTotal / 60).toFixed(1)} h`);
+
+    // 本周 vs 上周完成量
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    monday.setHours(0, 0, 0, 0);
+    const lastMonday = new Date(monday);
+    lastMonday.setDate(monday.getDate() - 7);
+    const inRange = (t, a, b) => {
+      const k = isoDay(t.completed_at || t.created_at);
+      return t.completed && k >= dayStr(a) && k <= dayStr(b);
+    };
+    const thisWeek = state.tasks.filter((t) => inRange(t, monday, now)).length;
+    const lastWeekEnd = new Date(monday);
+    lastWeekEnd.setDate(monday.getDate() - 1);
+    const lastWeek = state.tasks.filter((t) => inRange(t, lastMonday, lastWeekEnd)).length;
+    const growth = lastWeek > 0
+      ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100)
+      : (thisWeek > 0 ? 100 : 0);
+    setText('#kpiGrowth', `${growth >= 0 ? '+' : ''}${growth}%`);
+  }
+
+  // ---------- 完成趋势 ----------
+  function lastN(n) {
     const out = [];
-    for (let i = 6; i >= 0; i--) {
+    for (let i = n - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      out.push({ key: dayStr(d), label: WEEK_SHORT[d.getDay()] });
+      out.push({
+        key: dayStr(d),
+        label: n <= 7 ? WEEK_SHORT[d.getDay()] : `${d.getMonth() + 1}/${d.getDate()}`
+      });
     }
     return out;
   }
@@ -508,15 +651,16 @@
     if (!box) return;
     // 先清空，避免上一张固定宽度的 SVG 把容器撑开、导致测量结果越来越大
     box.innerHTML = '';
-    const w = box.clientWidth - 8;
-    const h = 178;
-    if (w < 80) return;
+    const w = box.clientWidth - 4;
+    const h = box.clientHeight || 128;
+    if (w < 60) return;
 
-    const padL = 30, padR = 14, padT = 16, padB = 26;
+    const n = state.dashRange || 7;
+    const padL = 26, padR = 10, padT = 14, padB = 22;
     const iw = w - padL - padR;
     const ih = h - padT - padB;
 
-    const days = last7();
+    const days = lastN(n);
     const data = days.map((d) => ({
       label: d.label,
       key: d.key,
@@ -525,9 +669,9 @@
     }));
 
     const max = Math.max(...data.map((d) => d.value), 1);
-    const x = (i) => padL + (iw / (data.length - 1)) * i;
+    const step = data.length > 1 ? iw / (data.length - 1) : 0;
+    const x = (i) => padL + step * i;
     const y = (v) => padT + ih - (ih * v) / max;
-
     const pts = data.map((d, i) => ({ ...d, cx: x(i), cy: y(d.value) }));
 
     let path = `M ${pts[0].cx} ${pts[0].cy}`;
@@ -537,24 +681,29 @@
     const grid = [0, 0.5, 1].map((f) => {
       const v = Math.round(max * f);
       return `<line x1="${padL}" y1="${y(v)}" x2="${w - padR}" y2="${y(v)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="${f === 0 ? '0' : '3 4'}"/>
-        <text x="${padL - 7}" y="${y(v) + 3.5}" text-anchor="end" font-size="9.5" fill="var(--text-3)">${v}</text>`;
+        <text x="${padL - 7}" y="${y(v) + 3.5}" text-anchor="end" font-size="9" fill="var(--text-3)">${v}</text>`;
     }).join('');
 
-    const labels = pts.map((p) =>
-      `<text x="${p.cx}" y="${h - 8}" text-anchor="middle" font-size="10" fill="var(--text-3)">${p.label}</text>`).join('');
+    // 点多时只画关键点，避免标签挤在一起
+    const labelStep = data.length <= 7 ? 1 : Math.ceil(data.length / 6);
+    const labels = pts.map((p, i) =>
+      (i % labelStep === 0 || i === pts.length - 1)
+        ? `<text x="${p.cx}" y="${h - 6}" text-anchor="middle" font-size="9" fill="var(--text-3)">${p.label}</text>`
+        : '').join('');
 
-    const dots = pts.map((p) =>
-      `<circle cx="${p.cx}" cy="${p.cy}" r="3.4" fill="#fff" stroke="var(--primary)" stroke-width="2"><title>${p.key}：${p.value} 个</title></circle>`).join('');
+    const dots = data.length <= 31
+      ? pts.map((p) => `<circle cx="${p.cx}" cy="${p.cy}" r="3.2" fill="#fff" stroke="var(--primary)" stroke-width="2"><title>${p.key}：${p.value} 个</title></circle>`).join('')
+      : pts.map((p) => `<circle cx="${p.cx}" cy="${p.cy}" r="1.6" fill="var(--primary)" opacity="0"><title>${p.key}：${p.value} 个</title></circle>`).join('');
 
     box.innerHTML = `
       <svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
         <defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#6366f1" stop-opacity="0.22"/>
-          <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+          <stop offset="0%" stop-color="#8b7bf5" stop-opacity="0.26"/>
+          <stop offset="100%" stop-color="#8b7bf5" stop-opacity="0"/>
         </linearGradient></defs>
         ${grid}${labels}
         <path d="${area}" fill="url(#areaGrad)"/>
-        <path d="${path}" fill="none" stroke="var(--primary)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="${path}" fill="none" stroke="var(--primary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
         ${dots}
       </svg>`;
   }
@@ -927,12 +1076,12 @@
     const body = $('#calendarBody');
     const firstDay = new Date(year, month, 1);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const startWeekday = firstDay.getDay();
+    const startWeekday = (firstDay.getDay() + 6) % 7;
     const prevDays = new Date(year, month, 0).getDate();
     const today = todayStr();
 
     let html = '<div class="cal-grid">';
-    WEEK_SHORT.forEach((w) => { html += `<div class="cal-head-cell">${w}</div>`; });
+    WEEK_MON.forEach((w) => { html += `<div class="cal-head-cell">${w}</div>`; });
 
     for (let i = startWeekday - 1; i >= 0; i--) {
       html += `<div class="cal-cell other-month"><div class="cal-day-num">${prevDays - i}</div></div>`;
@@ -960,11 +1109,11 @@
   function renderWeekView(d) {
     const body = $('#calendarBody');
     const start = new Date(d);
-    start.setDate(d.getDate() - d.getDay());
+    start.setDate(d.getDate() - ((d.getDay() + 6) % 7));
     const today = todayStr();
 
     let html = '<div class="cal-grid">';
-    WEEK_SHORT.forEach((w) => { html += `<div class="cal-head-cell">${w}</div>`; });
+    WEEK_MON.forEach((w) => { html += `<div class="cal-head-cell">${w}</div>`; });
     for (let i = 0; i < 7; i++) {
       const day = new Date(start);
       day.setDate(start.getDate() + i);
@@ -1107,6 +1256,7 @@
     }
     const btn = $('#pomStart');
     if (btn) btn.innerHTML = state.pom.running ? icon('pause') : icon('play');
+    updateMiniPom();
   }
 
   function setPomMode(mode) {
@@ -1435,11 +1585,26 @@
     if (t) t.classList.toggle('on', dark);
     const r = $('#remindSwitch');
     if (r) r.classList.toggle('on', state.remind);
+    const dt = $('#dashThemeSwitch');
+    if (dt) { dt.classList.toggle('on', dark); dt.setAttribute('aria-checked', String(dark)); }
+    const dr = $('#dashRemindSwitch');
+    if (dr) { dr.classList.toggle('on', state.remind); dr.setAttribute('aria-checked', String(state.remind)); }
+  }
+
+  function toggleRemind() {
+    state.remind = !state.remind;
+    localStorage.setItem(LS.remind, state.remind ? '1' : '0');
+    syncSwitches();
+    toast(state.remind ? '已开启每日提醒' : '已关闭每日提醒');
   }
 
   function toggleTheme() {
     applyTheme(state.theme === 'dark' ? 'light' : 'dark');
-    if (state.view === 'dashboard') renderLineChart();
+    syncSwitches();
+    if (state.view === 'dashboard') {
+      renderLineChart();
+      renderDashKpi();
+    }
   }
 
   const openSidebar = () => {
@@ -1878,6 +2043,17 @@
     wrap.scrollTop = wrap.scrollHeight;
   }
 
+  function askAI(text) {
+    const q = String(text || '').trim();
+    if (!q) return;
+    setView('ai');
+    const input = $('#aiInput');
+    if (input) input.value = q;
+    const mini = $('#dashAiInput');
+    if (mini) mini.value = '';
+    sendAIMessage();
+  }
+
   async function sendAIMessage() {
     const input = $('#aiInput');
     const text = input.value.trim();
@@ -1936,8 +2112,106 @@
     // 首页快捷入口
     $$('[data-goto]').forEach((b) => b.addEventListener('click', () => setView(b.dataset.goto)));
 
+    // 首页：我的任务
+    $('#dashTabs')?.addEventListener('click', (e) => {
+      const b = e.target.closest('.dash-tab');
+      if (!b) return;
+      state.dashTab = b.dataset.dtask;
+      $$('.dash-tab').forEach((x) => x.classList.toggle('active', x === b));
+      renderDashTasks();
+    });
+    $('#dashAddTask')?.addEventListener('click', () => openTaskModal(null));
+    document.addEventListener('click', (e) => {
+      const chk = e.target.closest('[data-dtoggle]');
+      if (!chk) return;
+      const t = state.tasks.find((x) => x.id === Number(chk.dataset.dtoggle));
+      if (t) toggleTask(t);
+    });
+
+    // 首页：迷你日历
+    $('#miniCal')?.addEventListener('click', (e) => {
+      const nav = e.target.closest('[data-mcal]');
+      if (nav) {
+        const d = new Date(state.miniCalDate);
+        d.setDate(1);
+        d.setMonth(d.getMonth() + Number(nav.dataset.mcal));
+        state.miniCalDate = d;
+        renderMiniCal();
+        return;
+      }
+      const day = e.target.closest('[data-calkey]');
+      if (day) {
+        const [y, m, dd] = day.dataset.calkey.split('-').map(Number);
+        state.calDate = new Date(y, m - 1, dd);
+        setView('calendar');
+      }
+    });
+
+    // 首页：迷你番茄钟
+    $('#miniPomStart')?.addEventListener('click', () => {
+      if (state.view !== 'pomodoro') setView('pomodoro');
+      startPomTimer();
+    });
+
+    // 首页：分析区间
+    $('#dashRange')?.addEventListener('click', (e) => {
+      const b = e.target.closest('.seg-btn');
+      if (!b) return;
+      $$('#dashRange .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
+      state.dashRange = Number(b.dataset.range);
+      renderLineChart();
+      renderDashKpi();
+    });
+
+    // 首页：AI 快捷提问
+    $$('.ai-chip').forEach((b) => b.addEventListener('click', () => askAI(b.dataset.aiask)));
+    $('#dashAiSend')?.addEventListener('click', () => askAI($('#dashAiInput').value));
+    $('#dashAiInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); askAI(e.target.value); }
+    });
+
+    // 首页：设置开关
+    $('#dashThemeSwitch')?.addEventListener('click', toggleTheme);
+    $('#dashRemindSwitch')?.addEventListener('click', toggleRemind);
+
+    // 顶部搜索：回车跳到任务管理并过滤
+    const gs = $('#globalSearch');
+    if (gs) {
+      gs.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        const q = gs.value.trim();
+        state.search = q;
+        state.tab = 'all';
+        state.page = 1;
+        setView('tasks');
+        const si = $('#searchInput');
+        if (si) si.value = q;
+        const clear = $('#searchClear');
+        if (clear) clear.hidden = !q;
+        renderTasksView();
+      });
+      document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          gs.focus();
+          gs.select();
+        }
+      });
+    }
+
+    // 通知与头像
+    $('#notifyBtn')?.addEventListener('click', () => {
+      const overdue = state.tasks.filter(isOverdue).length;
+      const dueToday = state.tasks.filter((t) => !t.completed && isToday(t)).length;
+      if (!overdue && !dueToday) { toast('暂无待处理提醒'); return; }
+      setView('today');
+    });
+    $('#userAvatar')?.addEventListener('click', () => setView('settings'));
+
     // 首页今日/最近列表点击
     document.addEventListener('click', (e) => {
+      // 首页行内的勾选圈单独处理，不要同时弹出详情
+      if (e.target.closest('[data-dtoggle]')) return;
       const item = e.target.closest('[data-open]');
       if (item) openDetail(Number(item.dataset.open));
     });
@@ -2153,12 +2427,7 @@
     $('#aiInput')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendAIMessage(); });
 
     // 设置
-    $('#remindSwitch')?.addEventListener('click', () => {
-      state.remind = !state.remind;
-      localStorage.setItem(LS.remind, state.remind ? '1' : '0');
-      syncSwitches();
-      toast(state.remind ? '已开启每日提醒' : '已关闭每日提醒');
-    });
+    $('#remindSwitch')?.addEventListener('click', toggleRemind);
     $('#pageSizeSelect')?.addEventListener('change', (e) => {
       state.pageSize = Number(e.target.value);
       localStorage.setItem(LS.pageSize, String(state.pageSize));

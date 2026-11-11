@@ -39,26 +39,42 @@ function check(name, ok, detail = '') {
   check('标题为智能任务管理系统 V3.0', title.includes('V3.0'), title);
 
   console.log('\n=== 2. 首页数据 ===');
-  const statTotal = await page.locator('#statTotal').innerText();
-  check('总任务数已渲染', /^\d+$/.test(statTotal), `总任务 ${statTotal}`);
-
   const apiData = await (await fetch(`${BASE}/api/tasks`)).json();
-  check('页面数字与接口一致', String(apiData.data.length) === statTotal,
-    `接口 ${apiData.data.length} / 页面 ${statTotal}`);
 
-  const heatCells = await page.locator('#heatmap .heat-cell').count();
-  check('热力图已渲染', heatCells > 300, `${heatCells} 个格子`);
+  const todayTotal = await page.locator('#statTodayTotal').innerText();
+  check('今日任务指标已渲染', /^\d+$/.test(todayTotal), `今日任务 ${todayTotal} 项`);
 
-  const lineSvg = await page.locator('#lineChartBox svg').count();
-  check('7 天趋势图已渲染', lineSvg === 1);
+  const weekDone = await page.locator('#statWeekDone').innerText();
+  check('本周完成指标已渲染', /^\d+$/.test(weekDone), `本周完成 ${weekDone} 项`);
 
-  const donut = await page.locator('#donutBox svg').count();
-  check('分类环形图已渲染', donut === 1);
+  const streak = await page.locator('#statStreak').innerText();
+  check('连续打卡指标已渲染', /^\d+$/.test(streak), `连续打卡 ${streak} 天`);
+
+  const focusHours = await page.locator('#statFocusHours').innerText();
+  check('专注时长指标已渲染', /^\d+(\.\d+)?$/.test(focusHours), `专注 ${focusHours} h`);
+
+  const dashRows = await page.locator('#dashTaskList .dash-task-item').count();
+  check('我的任务列表已渲染', dashRows > 0, `${dashRows} 条（接口共 ${apiData.data.length} 条）`);
+
+  const miniCalCells = await page.locator('#miniCal .mini-cal-day').count();
+  check('迷你日历渲染 6 周', miniCalCells === 42, `${miniCalCells} 格`);
+
+  const calHeads = await page.locator('#miniCal .mini-cal-week span').allInnerTexts();
+  check('迷你日历以周一开头', calHeads[0] === '一' && calHeads[6] === '日', calHeads.join(' '));
+
+  const miniPomTime = await page.locator('#miniPomTime').innerText();
+  check('迷你番茄钟显示时间', /^\d{2}:\d{2}$/.test(miniPomTime), miniPomTime);
+
+  const dashLineSvg = await page.locator('#lineChartBox svg').count();
+  check('完成趋势图已渲染', dashLineSvg === 1);
+
+  const syncText = await page.locator('#dashSyncState').innerText();
+  check('数据同步状态已显示', syncText.includes('Supabase'), syncText);
 
   await page.screenshot({ path: path.join(SHOT, 'v3-01-dashboard.png'), fullPage: true });
 
   console.log('\n=== 3. 九个视图切换 ===');
-  const views = ['today', 'calendar', 'tasks', 'plan', 'pomodoro', 'analytics', 'categories', 'settings', 'ai', 'dashboard'];
+  const views = ['today', 'calendar', 'tasks', 'kanban', 'plan', 'pomodoro', 'analytics', 'categories', 'settings', 'ai', 'dashboard'];
   for (const v of views) {
     await page.locator(`.nav-item[data-nav="${v}"]`).click();
     await page.waitForTimeout(260);
