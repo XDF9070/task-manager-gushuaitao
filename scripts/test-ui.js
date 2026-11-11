@@ -227,6 +227,15 @@ function check(name, ok, detail = '') {
   if (created) {
     const del = await fetch(`${BASE}/api/tasks/${created.id}`, { method: 'DELETE' });
     check('测试任务已清理', del.ok);
+
+    // 事件表按设计保留已删任务的历史，测试自己产生的事件要清掉，否则热力图会虚高
+    const SUP = process.env.SUPABASE_URL || 'https://kjbykpzbgypwnactmnos.supabase.co';
+    const KEY = process.env.SUPABASE_KEY || 'sb_publishable_tDjMLtzqakxonusEJECDTA_kVNPPg41';
+    const clean = await fetch(`${SUP}/rest/v1/task_events?task_id=eq.${created.id}`, {
+      method: 'DELETE',
+      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
+    });
+    check('测试事件已清理', clean.ok, `HTTP ${clean.status}`);
   }
 
   console.log('\n=== 14. 控制台错误 ===');
