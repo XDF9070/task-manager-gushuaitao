@@ -1819,17 +1819,51 @@
       const res = await fetch(API.aiStatus);
       const data = await res.json();
       state.aiInfo = data;
+      const note = $('#aiConfigNote');
       if (data.configured) {
         if (el) { el.textContent = `已连接 · ${data.model}`; el.classList.add('connected'); }
         if (backend) backend.innerHTML = '<span style="color:var(--success)">✓ 已配置 AI 服务</span>';
+        if (note) {
+          note.textContent = `当前使用 ${data.model}（${data.base.replace(/^https?:\/\//, '')}）。如需更换密钥或模型，在 Vercel 环境变量设置 AI_API_KEY / AI_MODEL 后重新部署即可，前端无需改动。`;
+        }
       } else {
         if (el) { el.textContent = '未配置'; el.classList.remove('connected'); }
         if (backend) backend.innerHTML = '<span style="color:var(--warning)">⚠️ 服务端未配置 AI_API_KEY，AI 助手暂不可用</span>';
+        if (note) note.textContent = '启用方式：在 Vercel 环境变量中添加 AI_API_KEY（可选 AI_API_BASE、AI_MODEL），重新部署后生效。';
       }
     } catch (_) {
       if (el) { el.textContent = '状态未知'; el.classList.remove('connected'); }
       if (backend) backend.textContent = '无法连接后端';
     }
+  }
+
+  // AI 回复是 Markdown，做一层最小渲染：加粗、行内代码、有序/无序列表
+  // 先 esc 再替换，保证不会把用户内容当 HTML 执行
+  function mdToHtml(text) {
+    const inline = (s) => s
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    const out = [];
+    let list = null;
+    const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+    String(text || '').split('\n').forEach((raw) => {
+      const line = raw.replace(/^#{1,6}\s*/, '').trim();
+      if (!line) { closeList(); return; }
+      const ul = line.match(/^[-*•]\s+(.*)$/);
+      const ol = line.match(/^(\d+)[.、)]\s+(.*)$/);
+      if (ul) {
+        if (list !== 'ul') { closeList(); out.push('<ul>'); list = 'ul'; }
+        out.push(`<li>${inline(esc(ul[1]))}</li>`);
+      } else if (ol) {
+        if (list !== 'ol') { closeList(); out.push('<ol>'); list = 'ol'; }
+        out.push(`<li>${inline(esc(ol[2]))}</li>`);
+      } else {
+        closeList();
+        out.push(`<p>${inline(esc(line))}</p>`);
+      }
+    });
+    closeList();
+    return out.join('');
   }
 
   function addAIMessage(text, isUser = false) {
@@ -1839,7 +1873,7 @@
     el.className = `ai-message ${isUser ? 'user' : 'bot'}`;
     el.innerHTML = `
       <div class="ai-msg-avatar">${icon(isUser ? 'user' : 'brain')}</div>
-      <div class="ai-msg-bubble"><p>${esc(text).replace(/\n/g, '<br>')}</p></div>`;
+      <div class="ai-msg-bubble">${isUser ? `<p>${esc(text).replace(/\n/g, '<br>')}</p>` : `<div class="ai-md">${mdToHtml(text)}</div>`}</div>`;
     wrap.appendChild(el);
     wrap.scrollTop = wrap.scrollHeight;
   }

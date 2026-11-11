@@ -223,7 +223,33 @@ function check(name, ok, detail = '') {
   check('移动端无横向溢出', scrollW <= 400, `页面宽度 ${scrollW}px`);
   await page.screenshot({ path: path.join(SHOT, 'v3-08-mobile.png'), fullPage: true });
 
-  console.log('\n=== 13. 清理测试数据 ===');
+  console.log('\n=== 13. AI 助手对话 ===');
+  // 上一节把视口改成了 390px 且侧边栏收起，这里先还原桌面视口再点导航
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.waitForTimeout(400);
+  await page.locator('.nav-item[data-nav="ai"]').click();
+  await page.waitForTimeout(600);
+  const badge = await page.locator('#aiStatus').innerText();
+  check('AI 状态显示已连接', badge.includes('已连接'), badge);
+
+  await page.locator('#aiInput').fill('用一句话说明你能帮我做什么');
+  await page.locator('#aiSend').click();
+  let aiReplied = true;
+  try {
+    await page.waitForFunction(() => {
+      const list = document.querySelectorAll('#aiMessages .ai-message.bot');
+      if (!list.length) return false;
+      const t = list[list.length - 1].innerText.trim();
+      return t && !t.includes('思考中') && !t.includes('❌');
+    }, null, { timeout: 45000 });
+  } catch { aiReplied = false; }
+  const lastBubble = await page.locator('#aiMessages .ai-message.bot').last().innerText().catch(() => '');
+  check('AI 能返回回答', aiReplied, aiReplied ? lastBubble.slice(0, 40).replace(/\n/g, ' ') : '45 秒内无回答');
+
+  const bubbleHtml = await page.locator('#aiMessages .ai-message.bot').last().innerHTML().catch(() => '');
+  check('回复已渲染 Markdown（无裸露星号）', !bubbleHtml.includes('**'));
+
+  console.log('\n=== 14. 清理测试数据 ===');
   if (created) {
     const del = await fetch(`${BASE}/api/tasks/${created.id}`, { method: 'DELETE' });
     check('测试任务已清理', del.ok);
@@ -238,7 +264,7 @@ function check(name, ok, detail = '') {
     check('测试事件已清理', clean.ok, `HTTP ${clean.status}`);
   }
 
-  console.log('\n=== 14. 控制台错误 ===');
+  console.log('\n=== 15. 控制台错误 ===');
   const realErrors = consoleErrors.filter((e) => !/favicon|404 \(Not Found\)/i.test(e));
   check('没有前端报错', realErrors.length === 0, realErrors.slice(0, 3).join(' | '));
 
