@@ -407,22 +407,17 @@
           </div>
         </div>
         <div class="card ai-config-card" id="aiConfigCard">
-          <h3>AI 接口配置</h3>
-          <p class="config-desc">配置你的 AI API 密钥以启用智能任务解析。支持 OpenAI 兼容接口。</p>
+          <h3>AI 服务状态</h3>
+          <p class="config-desc">AI 接口由后端安全代理，API Key 不会暴露在前端。如需启用，请在 Vercel 环境变量中配置 AI_API_KEY。</p>
           <div class="config-field">
-            <label>API Base URL</label>
-            <input type="text" id="aiApiBase" placeholder="https://api.openai.com/v1" value="">
+            <label>连接状态</label>
+            <div id="aiBackendStatus" style="padding:8px 0;color:var(--text-2)">检查中...</div>
           </div>
           <div class="config-field">
-            <label>API Key</label>
-            <input type="password" id="aiApiKey" placeholder="sk-..." value="">
+            <label>支持接口</label>
+            <div style="padding:8px 0;color:var(--text-2);font-size:13px">OpenAI 兼容接口（DeepSeek / 通义千问 / 月之暗面等均可）</div>
           </div>
-          <div class="config-field">
-            <label>模型名称</label>
-            <input type="text" id="aiModel" placeholder="gpt-3.5-turbo" value="gpt-3.5-turbo">
-          </div>
-          <button class="btn-primary" id="aiSaveConfig">保存配置</button>
-          <p class="config-note">配置保存在本地浏览器，不会上传到服务器。</p>
+          <p class="config-note">管理员在 Vercel → Settings → Environment Variables 添加：AI_API_KEY、AI_API_BASE（可选）、AI_MODEL（可选）</p>
         </div>
       </div>
     </section>
