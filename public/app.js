@@ -853,9 +853,11 @@
           localStorage.setItem(LS.pomHistory, String(state.pom.focusCount));
           $('#pomTodayCount').textContent = state.pom.focusCount;
           $('#pomTotalCount').textContent = state.pom.focusCount;
+          logPomodoro(Math.round(state.pom.totalSeconds / 60), 'focus');
           toast('专注完成！休息一下吧 ☕');
           setPomMode('short');
         } else {
+          logPomodoro(Math.round(state.pom.totalSeconds / 60), state.pom.mode);
           toast('休息结束，继续加油！💪');
           setPomMode('focus');
         }
@@ -883,16 +885,27 @@
   }
 
   // ============================================================
-  // AI 助手
+  // AI 助手（后端代理，Key 不暴露在前端）
   // ============================================================
-  function updateAIStatus() {
+  async function updateAIStatus() {
     const el = $('#aiStatus');
-    if (state.aiConfig.base && state.aiConfig.key) {
-      el.textContent = '已连接';
-      el.classList.add('connected');
-    } else {
-      el.textContent = '未连接（请配置API）';
+    const backendEl = $('#aiBackendStatus');
+    try {
+      const res = await fetch('/api/ai/status');
+      const data = await res.json();
+      if (data.configured) {
+        el.textContent = `已连接 · ${data.model}`;
+        el.classList.add('connected');
+        if (backendEl) backendEl.innerHTML = '<span style="color:var(--success)">✓ 已配置 AI 服务</span>';
+      } else {
+        el.textContent = '未配置';
+        el.classList.remove('connected');
+        if (backendEl) backendEl.innerHTML = '<span style="color:var(--warning)">⚠️ 未配置 AI_API_KEY，AI 助手暂不可用</span>';
+      }
+    } catch (_) {
+      el.textContent = '状态未知';
       el.classList.remove('connected');
+      if (backendEl) backendEl.textContent = '无法连接后端';
     }
   }
 
@@ -914,46 +927,29 @@
     addAIMessage(text, true);
     input.value = '';
 
-    if (!state.aiConfig.base || !state.aiConfig.key) {
-      addAIMessage('⚠️ 还没有配置 AI API。请在右侧配置面板填入 API Base URL 和 API Key，然后我就能帮你智能解析任务了。');
-      return;
-    }
-
     try {
-      const res = await fetch(`${state.aiConfig.base}/chat/completions`, {
+      const res = await fetch('/api/ai/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${state.aiConfig.key}`
-        },
-        body: JSON.stringify({
-          model: state.aiConfig.model,
-          messages: [
-            { role: 'system', content: '你是一个任务管理助手。用户会用自然语言描述任务，你需要提取任务标题、优先级（高/中/低）、截止日期（YYYY-MM-DD格式）和分类（学习/工作/健身/生活）。以JSON格式返回：{"title":"任务标题","priority":"中","due_date":"2026-11-12","category":"学习"}。如果没有提到日期就填null，没有分类就填null。' },
-            { role: 'user', content: text }
-          ],
-          temperature: 0.3
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text })
       });
       const data = await res.json();
-      const reply = data.choices?.[0]?.message?.content || '无法解析，请换个说法试试。';
+      const reply = data.reply || data.message || '无法解析，请换个说法试试。';
       addAIMessage(reply);
     } catch (err) {
-      addAIMessage('❌ 请求失败：' + err.message + '。请检查API配置是否正确。');
+      addAIMessage('❌ 请求失败：' + err.message);
     }
   }
 
-  function saveAIConfig() {
-    state.aiConfig = {
-      base: $('#aiApiBase').value.trim(),
-      key: $('#aiApiKey').value.trim(),
-      model: $('#aiModel').value.trim() || 'gpt-3.5-turbo'
-    };
-    localStorage.setItem(LS.aiApiBase, state.aiConfig.base);
-    localStorage.setItem(LS.aiApiKey, state.aiConfig.key);
-    localStorage.setItem(LS.aiModel, state.aiConfig.model);
-    updateAIStatus();
-    toast('AI 配置已保存');
+  // 番茄钟完成时记录到后端（可选，表不存在时静默失败）
+  async function logPomodoro(durationMin, type, taskTitle) {
+    try {
+      await fetch('/api/pomodoro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duration: durationMin, type, task_title: taskTitle || null })
+      });
+    } catch (_) { /* 静默失败 */ }
   }
 
   // ============================================================
@@ -1062,10 +1058,6 @@
     $('#pomFocusLen').value = localStorage.getItem(LS.pomFocus) || 25;
     $('#pomShortLen').value = localStorage.getItem(LS.pomShort) || 5;
     $('#pomLongLen').value = localStorage.getItem(LS.pomLong) || 15;
-    // AI配置填充
-    $('#aiApiBase').value = state.aiConfig.base;
-    $('#aiApiKey').value = state.aiConfig.key;
-    $('#aiModel').value = state.aiConfig.model;
     $('#pageSizeSelect').value = String(state.pageSize);
     syncSwitches();
   }
@@ -1398,7 +1390,6 @@
     $('#aiInput')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') sendAIMessage();
     });
-    $('#aiSaveConfig')?.addEventListener('click', saveAIConfig);
 
     // 设置
     $('#remindSwitch')?.addEventListener('click', () => {
