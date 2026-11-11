@@ -46,6 +46,7 @@ function todayStr(offset = 0) {
   const nine = ['dueDate', 'category', 'completedAt', 'status', 'repeat', 'subtasks', 'pomodoro', 'heatmap', 'categories'];
   const missing = nine.filter((k) => f[k] !== true);
   check('九项 V3 能力全部启用', missing.length === 0, missing.length ? '缺失: ' + missing.join(',') : '9/9');
+  check('AI 助手已启用', f.ai === true, `ai=${f.ai}`);
   const baseCount = meta.json.counts.total;
   console.log(`        基线任务数：${baseCount}`);
 
@@ -249,7 +250,18 @@ function todayStr(offset = 0) {
   check('不存在任务的子任务返回空数组', noSub.status === 200 && Array.isArray(noSub.json.data) && noSub.json.data.length === 0,
     `HTTP ${noSub.status}`);
 
-  console.log('\n=== 11. 清理测试数据 ===');
+  console.log('\n=== 11. AI 助手 ===');
+  const aiStatus = await api('GET', '/api/ai/status');
+  check('AI 状态为已配置', aiStatus.status === 200 && aiStatus.json.configured === true,
+    `${aiStatus.json.model} @ ${aiStatus.json.base}`);
+  const aiChat = await api('POST', '/api/ai/chat', { message: '用四个字回答：现在几点' });
+  check('AI 返回真实回答',
+    aiChat.status === 200 && typeof aiChat.json.reply === 'string' && aiChat.json.reply.trim().length > 0,
+    aiChat.status === 200 ? (aiChat.json.reply || '').slice(0, 40) : `HTTP ${aiChat.status}`);
+  const aiBad = await api('POST', '/api/ai/chat', { message: '   ' });
+  check('AI 空消息返回 400', aiBad.status === 400, `HTTP ${aiBad.status}`);
+
+  console.log('\n=== 12. 清理测试数据 ===');
   let deleted = 0;
   for (const id of createdTaskIds) {
     const r = await api('DELETE', `/api/tasks/${id}`);

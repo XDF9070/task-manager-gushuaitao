@@ -33,7 +33,11 @@ const supabase = createClient(
 // ------------------------------------------------------------
 // AI 配置（可选，不配也能用其它功能）
 // ------------------------------------------------------------
-const AI_API_KEY = (process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY || '').trim();
+const AI_API_KEY = (
+  process.env.AI_API_KEY ||
+  process.env.DEEPSEEK_API_KEY ||
+  'sk-050cf2e99c694444ba800af662969677'
+).trim();
 const AI_API_BASE = (process.env.AI_API_BASE || 'https://api.deepseek.com').trim().replace(/\/+$/, '');
 const AI_MODEL = (process.env.AI_MODEL || process.env.DEEPSEEK_MODEL || 'deepseek-chat').trim();
 const AI_READY = !!AI_API_KEY;
